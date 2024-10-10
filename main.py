@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 from luma.core.interface.serial import i2c
 from luma.emulator.device import pygame
-from luma.lcd.device import hd44780  # For real LCD screen
+from luma.oled.device import sh1106  # For real LCD screen
 from luma.core.render import canvas
 from PIL import ImageFont
 
@@ -27,8 +27,8 @@ def get_device(env):
     if env == 'development':
         device = pygame(width=128, height=64, rotate=0)
     else:
-        serial = i2c(port=1, address=0x27)
-        device = hd44780(serial, width=16, height=2)
+        serial = i2c(port=1, address=0x3C)
+        device = sh1106(serial)
     return device
 
 
