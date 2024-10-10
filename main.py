@@ -15,13 +15,17 @@ def main():
 
     device = get_device(env)
 
-    default_font = ImageFont.load_default()
+    font_normal = make_font("DejaVuSansMono.ttf", 10)
+    font_bold = make_font("DejaVuSansMono-Bold.ttf", 12)
     awesome_font = make_font("fontawesome-webfont.ttf", 12)
 
     while True:
         with canvas(device) as draw:
-            draw.text((10, 20), "\uf072", font=awesome_font, fill="white")
-            draw.text((25, 20), "Hello, World!", font=default_font, fill="white")
+            draw.text((5, 0), "\uf072", font=awesome_font, fill="white")
+            draw.text((20, 0), "LH9200", font=font_bold, fill="white")
+            draw.text((5, 15), "Height: 15400 ft", font=font_normal, fill="white")
+            draw.text((5, 25), "Distance: 15300 m", font=font_normal, fill="white")
+            draw.text((5, 35), "Type: B773", font=font_normal, fill="white")
 
         if env == 'development':
             device.show()
