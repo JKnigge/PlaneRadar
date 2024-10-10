@@ -8,32 +8,34 @@ from PIL import ImageFont
 
 
 def main():
-    # Load environment variables from .env file
-    load_dotenv()
 
-    # Get the environment setting
-    env = os.getenv('ENVIRONMENT', 'development')  # Default to 'development'
+    env = get_environment()
 
-    # Set up the device depending on the environment
-    if env == 'development':
-        # Use the pygame emulator for development
-        device = pygame(width=128, height=64, rotate=0)
-    else:
-        # Use the real LCD screen via I2C on Raspberry Pi
-        serial = i2c(port=1, address=0x27)  # Adjust parameters for your screen
-        device = hd44780(serial, width=16, height=2)
+    device = get_device(env)
 
-    # Load a font (optional)
     font = ImageFont.load_default()
 
     while True:
-    # Display some text on the screen
         with canvas(device) as draw:
             draw.text((10, 20), "Hello, World!", font=font, fill="white")
 
-        # Keep the emulator window open (for pygame emulator only)
         if env == 'development':
             device.show()
+
+
+def get_device(env):
+    if env == 'development':
+        device = pygame(width=128, height=64, rotate=0)
+    else:
+        serial = i2c(port=1, address=0x27)
+        device = hd44780(serial, width=16, height=2)
+    return device
+
+
+def get_environment():
+    load_dotenv()
+    env = os.getenv('ENVIRONMENT', 'development')
+    return env
 
 
 if __name__ == "__main__":
