@@ -1,4 +1,6 @@
 import os
+from pathlib import Path
+
 from dotenv import load_dotenv
 from luma.core.interface.serial import i2c
 from luma.emulator.device import pygame
@@ -13,11 +15,13 @@ def main():
 
     device = get_device(env)
 
-    font = ImageFont.load_default()
+    default_font = ImageFont.load_default()
+    awesome_font = make_font("fontawesome-webfont.ttf", 12)
 
     while True:
         with canvas(device) as draw:
-            draw.text((10, 20), "Hello, World!", font=font, fill="white")
+            draw.text((10, 20), "\uf072", font=awesome_font, fill="white")
+            draw.text((25, 20), "Hello, World!", font=default_font, fill="white")
 
         if env == 'development':
             device.show()
@@ -36,6 +40,11 @@ def get_environment():
     load_dotenv()
     env = os.getenv('ENVIRONMENT', 'development')
     return env
+
+
+def make_font(name, size):
+    font_path = str(Path(__file__).resolve().parent.joinpath('fonts', name))
+    return ImageFont.truetype(font_path, size)
 
 
 if __name__ == "__main__":
