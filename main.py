@@ -15,7 +15,7 @@ from time import time, sleep
 from math import radians, sqrt, atan2, cos
 
 from SBSMessage import SBSMessage
-from database_models import Callsigns
+from database_models import Callsigns, Positions
 
 SCREEN_TIME_IN_SECONDS = 5
 
@@ -51,10 +51,10 @@ def process_message(input):
     return dict(zip(RAW_MESSAGE_FORMAT, raw_message.split(",")))
 
 
-def get_observer_location_in_degrees():
+def get_observer_location_in_degrees() -> (float, float):
     latitude = float(os.getenv('LATITUDE', 50.036))
     longitude = float(os.getenv('LONGITUDE', 8.553))
-    return (radians(latitude), radians(longitude))
+    return radians(latitude), radians(longitude)
 
 
 def write_on_screen(message):
@@ -180,7 +180,7 @@ def load_aircraft_data():
 
 
 def handle_transmission_type_1(message: SBSMessage):
-    callsign = get_last_message_during_last_hour_for(message.hex_ident)
+    callsign = get_last_callsign_during_last_hour_for(message.hex_ident)
     if callsign is None:
         callsign = create_callsign_entry(message)
     callsign.last_message_generated = message.get_generated_datetime()
@@ -194,7 +194,7 @@ def create_callsign_entry(message: SBSMessage) -> Callsigns:
         hex_ident=message.hex_ident,
         callsign=message.callsign,
         first_message_generated=message.get_generated_datetime(),
-        first_message_received = datetime.datetime.now(),
+        first_message_received=datetime.datetime.now(),
         registration=message.registration,
         typecode=message.typecode,
         operator=message.operator,
@@ -203,13 +203,47 @@ def create_callsign_entry(message: SBSMessage) -> Callsigns:
     return callsign
 
 
-def get_last_message_during_last_hour_for(hex_ident: str) -> Callsigns:
+def handle_transmission_type_3(message: SBSMessage):
+    callsign = get_last_callsign_during_last_hour_for(message.hex_ident)
+    if callsign is None:
+        return
+    try:
+        plane_postion_in_radians = (radians(float(message.latitude)), radians(float(message.longitude)))
+        observer_position = get_observer_location_in_degrees()
+        position = Positions(
+            hex_ident=message.hex_ident,
+            callsign_id=callsign.id,
+            latitude=message.latitude,
+            longitude=message.longitude,
+            altitude=message.altitude,
+            distance=calculate_distance(plane_postion_in_radians, observer_position),
+            bearing=calculate_bearing(plane_postion_in_radians, observer_position)
+        )
+        position.save()
+
+    except ValueError:
+        pass
+
+
+def get_last_callsign_during_last_hour_for(hex_ident: str) -> Callsigns:
     one_hour_ago = datetime.datetime.now() - datetime.timedelta(hours=1)
     return (Callsigns
             .select()
             .where((Callsigns.hex_ident == hex_ident) & (Callsigns.last_message_received > one_hour_ago))
             .order_by(Callsigns.last_message_received.desc())
             .first())
+
+
+def calculate_distance(plane_postion_in_radians: (float, float), observer_position: (float, float)) -> float:
+    F0 = cos(observer_position[0])  # local conversion for spherical coordinates
+    distance = round(R0 * sqrt((plane_postion_in_radians[0] - observer_position[0]) ** 2 + F0 ** 2 * (plane_postion_in_radians[1] - observer_position[1]) ** 2), 2)
+    return distance
+
+
+def calculate_bearing(plane_postion_in_radians: (float, float), observer_position: (float, float)) -> float:
+    F0 = cos(observer_position[0])  # local conversion for spherical coordinates
+    bearing = round(atan2(plane_postion_in_radians[0] - observer_position[0], F0 * (plane_postion_in_radians[1] - observer_position[1])), 2)
+    return bearing
 
 
 if __name__ == "__main__":
@@ -224,6 +258,8 @@ if __name__ == "__main__":
 
             if message.message_type == "MSG" and message.transmission_type == '1':
                 handle_transmission_type_1(message)
+            elif message.message_type == "MSG" and message.transmission_type == '3':
+                handle_transmission_type_3(message)
 
             # processed_message = process_message(raw_message, aircraft_data)
             # write_on_screen(processed_message)

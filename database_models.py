@@ -1,4 +1,4 @@
-from peewee import Model, CharField
+from peewee import Model, CharField, FloatField
 from database_utils import database
 from peewee import IntegerField, DateTimeField
 
@@ -20,5 +20,16 @@ class Callsigns(BaseModel):
     typecode = CharField(null=True)
     operator = CharField(null=True)
     num_messages = IntegerField()
+
+
+class Positions(BaseModel):
+    id = IntegerField(primary_key=True)
+    hex_ident = CharField(null=True)
+    callsign_id = IntegerField()
+    latitude = FloatField(null=True)
+    longitude = FloatField(null=True)
+    altitude = IntegerField(null=True)
+    distance = FloatField(null=True)
+    bearing = FloatField(null=True)
 
 
