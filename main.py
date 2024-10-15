@@ -22,7 +22,7 @@ SCREEN_TIME_IN_SECONDS = 5
 R0 = 6371.0
 
 
-def write_on_screen(message):
+def write_on_screen(callsign: Callsigns, position: Positions):
     env = os.getenv('ENVIRONMENT', 'development')
 
     device = get_device(env)
@@ -33,10 +33,10 @@ def write_on_screen(message):
 
     with canvas(device) as draw:
         draw.text((5, 0), "\uf072", font=awesome_font, fill="white")
-        draw.text((20, 0), "LH9200", font=font_bold, fill="white")
-        draw.text((5, 15), f"Height: {message['altitude']} ft", font=font_normal, fill="white")
-        draw.text((5, 25), f"Distance: {message['distance']} m", font=font_normal, fill="white")
-        draw.text((5, 35), f"Type: {message['typecode']}", font=font_normal, fill="white")
+        draw.text((20, 0), callsign.callsign, font=font_bold, fill="white")
+        draw.text((5, 15), f"Alt: {position.altitude} ft", font=font_normal, fill="white")
+        draw.text((5, 25), f"Dist: {position.distance} km", font=font_normal, fill="white")
+        draw.text((5, 35), f"Type: {callsign.typecode}", font=font_normal, fill="white")
 
     if env == 'development':
         device.show()
@@ -142,6 +142,7 @@ def handle_transmission_type_3(message: SBSMessage):
             message_generated= message.get_generated_datetime()
         )
         position.save()
+        write_on_screen(callsign, position)
 
     except ValueError:
         pass
@@ -191,6 +192,5 @@ if __name__ == "__main__":
             elif message.message_type == "MSG" and message.transmission_type == '3':
                 handle_transmission_type_3(message)
 
-            # write_on_screen(processed_message)
     except KeyboardInterrupt:
         pass
