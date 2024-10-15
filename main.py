@@ -1,4 +1,5 @@
 import csv
+import datetime
 import os
 from io import StringIO
 from pathlib import Path
@@ -12,6 +13,9 @@ from luma.core.render import canvas
 from PIL import ImageFont
 from time import time, sleep
 from math import radians, sqrt, atan2, cos
+
+from SBSMessage import SBSMessage
+from database_models import Callsigns
 
 SCREEN_TIME_IN_SECONDS = 5
 
@@ -43,10 +47,15 @@ RAW_MESSAGE_FORMAT = [
 ]
 
 
+def process_message(input):
+    return dict(zip(RAW_MESSAGE_FORMAT, raw_message.split(",")))
+
+
 def get_observer_location_in_degrees():
     latitude = float(os.getenv('LATITUDE', 50.036))
     longitude = float(os.getenv('LONGITUDE', 8.553))
     return (radians(latitude), radians(longitude))
+
 
 def write_on_screen(message):
     env = os.getenv('ENVIRONMENT', 'development')
@@ -95,8 +104,10 @@ def process_message(raw_message, aircraft_data):
     if "Latitude" in message and "Longitude" in message:
         try:
             x = (radians(float(message["Latitude"])), radians(float(message["Longitude"])))
-            processed_message["distance"] = round(R0 * sqrt((x[0] - observer_position[0]) ** 2 + F0 ** 2 * (x[1] - observer_position[1]) ** 2), 2)
-            processed_message["bearing"] = round(atan2(x[0] - observer_position[0], F0 * (x[1] - observer_position[1])), 2)
+            processed_message["distance"] = round(
+                R0 * sqrt((x[0] - observer_position[0]) ** 2 + F0 ** 2 * (x[1] - observer_position[1]) ** 2), 2)
+            processed_message["bearing"] = round(atan2(x[0] - observer_position[0], F0 * (x[1] - observer_position[1])),
+                                                 2)
         except ValueError:
             pass
 
@@ -168,6 +179,39 @@ def load_aircraft_data():
             return read_aircraft_data(f)
 
 
+def handle_transmission_type_1(message: SBSMessage):
+    callsign = get_last_message_during_last_hour_for(message.hex_ident)
+    if callsign is None:
+        callsign = create_callsign_entry(message)
+    callsign.last_message_generated = message.get_generated_datetime()
+    callsign.last_message_received = datetime.datetime.now()
+    callsign.num_messages = callsign.num_messages + 1
+    callsign.save()
+
+
+def create_callsign_entry(message: SBSMessage) -> Callsigns:
+    callsign = Callsigns(
+        hex_ident=message.hex_ident,
+        callsign=message.callsign,
+        first_message_generated=message.get_generated_datetime(),
+        first_message_received = datetime.datetime.now(),
+        registration=message.registration,
+        typecode=message.typecode,
+        operator=message.operator,
+        num_messages=0
+    )
+    return callsign
+
+
+def get_last_message_during_last_hour_for(hex_ident: str) -> Callsigns:
+    one_hour_ago = datetime.datetime.now() - datetime.timedelta(hours=1)
+    return (Callsigns
+            .select()
+            .where((Callsigns.hex_ident == hex_ident) & (Callsigns.last_message_received > one_hour_ago))
+            .order_by(Callsigns.last_message_received.desc())
+            .first())
+
+
 if __name__ == "__main__":
     try:
         load_dotenv()
@@ -176,7 +220,12 @@ if __name__ == "__main__":
             print("Please input:")
             raw_message = input()
             print("Processing input")
-            processed_message = process_message(raw_message, aircraft_data)
-            write_on_screen(processed_message)
+            message = SBSMessage(raw_message, aircraft_data)
+
+            if message.message_type == "MSG" and message.transmission_type == '1':
+                handle_transmission_type_1(message)
+
+            # processed_message = process_message(raw_message, aircraft_data)
+            # write_on_screen(processed_message)
     except KeyboardInterrupt:
         pass
