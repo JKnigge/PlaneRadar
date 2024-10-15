@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS `positions` (
   `altitude` int DEFAULT NULL,
   `distance` float DEFAULT NULL,
   `bearing` float DEFAULT NULL,
+  `message_generated` datetime DEFAULT NULL,
+  `message_received` datetime NOT NULL DEFAULT (now()),
   PRIMARY KEY (`id`),
   KEY `positions.callsign` (`callsign_id`) USING BTREE,
   CONSTRAINT `positions.callsign` FOREIGN KEY (`callsign_id`) REFERENCES `callsigns` (`id`)

@@ -31,5 +31,7 @@ class Positions(BaseModel):
     altitude = IntegerField(null=True)
     distance = FloatField(null=True)
     bearing = FloatField(null=True)
+    message_generated = DateTimeField(null=True)
+    message_received = DateTimeField()
 
 

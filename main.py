@@ -138,7 +138,8 @@ def handle_transmission_type_3(message: SBSMessage):
             longitude=message.longitude,
             altitude=message.altitude,
             distance=calculate_distance(plane_postion_in_radians, observer_position),
-            bearing=calculate_bearing(plane_postion_in_radians, observer_position)
+            bearing=calculate_bearing(plane_postion_in_radians, observer_position),
+            message_generated= message.get_generated_datetime()
         )
         position.save()
 
