@@ -21,41 +21,6 @@ SCREEN_TIME_IN_SECONDS = 5
 
 R0 = 6371.0
 
-RAW_MESSAGE_FORMAT = [
-    "Message type",
-    "Transmission Type",
-    "Session ID",
-    "AircraftID",
-    "HexIdent",
-    "FlightID",
-    "Date message generated",
-    "Time message generated",
-    "Date message logged",
-    "Time message logged",
-    "Callsign",
-    "Altitude",
-    "GroundSpeed",
-    "Track",
-    "Latitude",
-    "Longitude",
-    "VerticalRate",
-    "Squawk",
-    "Alert",
-    "Emergency",
-    "SPI",
-    "IsOnGround"
-]
-
-
-def process_message(input):
-    return dict(zip(RAW_MESSAGE_FORMAT, raw_message.split(",")))
-
-
-def get_observer_location_in_degrees() -> (float, float):
-    latitude = float(os.getenv('LATITUDE', 50.036))
-    longitude = float(os.getenv('LONGITUDE', 8.553))
-    return radians(latitude), radians(longitude)
-
 
 def write_on_screen(message):
     env = os.getenv('ENVIRONMENT', 'development')
@@ -80,50 +45,6 @@ def write_on_screen(message):
 
     with canvas(device) as draw:
         draw.rectangle(device.bounding_box, outline="black", fill="black")
-
-
-def process_message(raw_message, aircraft_data):
-    message = dict(zip(RAW_MESSAGE_FORMAT, raw_message.split(",")))
-    processed_message = {"processing_time": int(time() * 1000)}
-    observer_position = get_observer_location_in_degrees()
-
-    # local conversion for spherical coordinates
-    F0 = cos(observer_position[0])
-
-    if "HexIdent" in message:
-        icao_address = message["HexIdent"]
-        processed_message["address"] = icao_address
-        try:
-            record = aircraft_data[icao_address.lower()]
-            processed_message["registration"] = record["registration"]
-            processed_message["typecode"] = record["typecode"]
-            processed_message["operator"] = record["operator"]
-        except KeyError:
-            pass
-
-    if "Latitude" in message and "Longitude" in message:
-        try:
-            x = (radians(float(message["Latitude"])), radians(float(message["Longitude"])))
-            processed_message["distance"] = round(
-                R0 * sqrt((x[0] - observer_position[0]) ** 2 + F0 ** 2 * (x[1] - observer_position[1]) ** 2), 2)
-            processed_message["bearing"] = round(atan2(x[0] - observer_position[0], F0 * (x[1] - observer_position[1])),
-                                                 2)
-        except ValueError:
-            pass
-
-    if "Altitude" in message:
-        try:
-            processed_message["altitude"] = int(message["Altitude"])
-        except ValueError:
-            pass
-
-    if "FlightID" in message:
-        try:
-            processed_message["flight_id"] = message["FlightID"]
-        except ValueError:
-            pass
-
-    return processed_message
 
 
 def get_device(env):
@@ -236,14 +157,22 @@ def get_last_callsign_during_last_hour_for(hex_ident: str) -> Callsigns:
 
 def calculate_distance(plane_postion_in_radians: (float, float), observer_position: (float, float)) -> float:
     F0 = cos(observer_position[0])  # local conversion for spherical coordinates
-    distance = round(R0 * sqrt((plane_postion_in_radians[0] - observer_position[0]) ** 2 + F0 ** 2 * (plane_postion_in_radians[1] - observer_position[1]) ** 2), 2)
+    distance = round(R0 * sqrt((plane_postion_in_radians[0] - observer_position[0]) ** 2 + F0 ** 2 * (
+                plane_postion_in_radians[1] - observer_position[1]) ** 2), 2)
     return distance
 
 
 def calculate_bearing(plane_postion_in_radians: (float, float), observer_position: (float, float)) -> float:
     F0 = cos(observer_position[0])  # local conversion for spherical coordinates
-    bearing = round(atan2(plane_postion_in_radians[0] - observer_position[0], F0 * (plane_postion_in_radians[1] - observer_position[1])), 2)
+    bearing = round(atan2(plane_postion_in_radians[0] - observer_position[0],
+                          F0 * (plane_postion_in_radians[1] - observer_position[1])), 2)
     return bearing
+
+
+def get_observer_location_in_degrees() -> (float, float):
+    latitude = float(os.getenv('LATITUDE', 50.036))
+    longitude = float(os.getenv('LONGITUDE', 8.553))
+    return radians(latitude), radians(longitude)
 
 
 if __name__ == "__main__":
@@ -261,7 +190,6 @@ if __name__ == "__main__":
             elif message.message_type == "MSG" and message.transmission_type == '3':
                 handle_transmission_type_3(message)
 
-            # processed_message = process_message(raw_message, aircraft_data)
             # write_on_screen(processed_message)
     except KeyboardInterrupt:
         pass
