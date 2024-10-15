@@ -28,14 +28,14 @@ CREATE TABLE IF NOT EXISTS `callsigns` (
 CREATE TABLE IF NOT EXISTS `positions` (
   `id` int NOT NULL,
   `hex_ident` varchar(50) DEFAULT NULL,
-  `callsign` int NOT NULL,
+  `callsign_id` int NOT NULL,
   `latitude` float DEFAULT NULL,
   `longitude` float DEFAULT NULL,
-  `height` int DEFAULT NULL,
+  `altitude` int DEFAULT NULL,
   `distance` float DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `positions.callsign` (`callsign`),
-  CONSTRAINT `positions.callsign` FOREIGN KEY (`callsign`) REFERENCES `callsigns` (`id`)
+  KEY `positions.callsign` (`callsign_id`) USING BTREE,
+  CONSTRAINT `positions.callsign` FOREIGN KEY (`callsign_id`) REFERENCES `callsigns` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;
