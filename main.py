@@ -11,7 +11,6 @@ from luma.emulator.device import pygame
 from luma.oled.device import sh1106  # For real LCD screen
 from luma.core.render import canvas
 from PIL import ImageFont
-from time import time, sleep
 from math import radians, sqrt, atan2, cos
 
 from SBSMessage import SBSMessage
@@ -40,11 +39,6 @@ def write_on_screen(callsign: Callsigns, position: Positions):
 
     if env == 'development':
         device.show()
-
-    sleep(SCREEN_TIME_IN_SECONDS)
-
-    with canvas(device) as draw:
-        draw.rectangle(device.bounding_box, outline="black", fill="black")
 
 
 def get_device(env):
