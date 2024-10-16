@@ -21,25 +21,7 @@ SCREEN_TIME_IN_SECONDS = 5
 
 R0 = 6371.0
 
-
-def write_on_screen(callsign: Callsigns, position: Positions):
-    env = os.getenv('ENVIRONMENT', 'development')
-
-    device = get_device(env)
-
-    font_normal = make_font("DejaVuSansMono.ttf", 10)
-    font_bold = make_font("DejaVuSansMono-Bold.ttf", 12)
-    awesome_font = make_font("fontawesome-webfont.ttf", 12)
-
-    with canvas(device) as draw:
-        draw.text((5, 0), "\uf072", font=awesome_font, fill="white")
-        draw.text((20, 0), callsign.callsign, font=font_bold, fill="white")
-        draw.text((5, 15), f"Alt: {position.altitude} ft", font=font_normal, fill="white")
-        draw.text((5, 25), f"Dist: {position.distance} km", font=font_normal, fill="white")
-        draw.text((5, 35), f"Type: {callsign.typecode}", font=font_normal, fill="white")
-
-    if env == 'development':
-        device.show()
+closest_aircraft = None
 
 
 def get_device(env):
@@ -134,10 +116,10 @@ def handle_transmission_type_3(message: SBSMessage):
             altitude=message.altitude,
             distance=calculate_distance(plane_postion_in_radians, observer_position),
             bearing=calculate_bearing(plane_postion_in_radians, observer_position),
-            message_generated= message.get_generated_datetime()
+            message_generated=message.get_generated_datetime()
         )
         position.save()
-        write_on_screen(callsign, position)
+        save_closest_aircraft(position)
 
     except ValueError:
         pass
@@ -155,7 +137,7 @@ def get_last_callsign_during_last_hour_for(hex_ident: str) -> Callsigns:
 def calculate_distance(plane_postion_in_radians: (float, float), observer_position: (float, float)) -> float:
     F0 = cos(observer_position[0])  # local conversion for spherical coordinates
     distance = round(R0 * sqrt((plane_postion_in_radians[0] - observer_position[0]) ** 2 + F0 ** 2 * (
-                plane_postion_in_radians[1] - observer_position[1]) ** 2), 2)
+            plane_postion_in_radians[1] - observer_position[1]) ** 2), 2)
     return distance
 
 
@@ -172,7 +154,46 @@ def get_observer_location_in_degrees() -> (float, float):
     return radians(latitude), radians(longitude)
 
 
-if __name__ == "__main__":
+def save_closest_aircraft(position_message: Positions):
+    global closest_aircraft
+    if (closest_aircraft is None
+            or closest_aircraft.hex_ident == position_message.hex_ident
+            or position_message.distance < closest_aircraft.distance):
+        closest_aircraft = position_message
+
+
+def display_closest_aircraft():
+    global closest_aircraft
+    if closest_aircraft is None:
+        return
+    callsign = get_last_callsign_during_last_hour_for(closest_aircraft.hex_ident)
+    if callsign is None:
+        return
+    write_on_screen(callsign, closest_aircraft)
+
+
+def write_on_screen(callsign: Callsigns, position: Positions):
+    env = os.getenv('ENVIRONMENT', 'development')
+
+    device = get_device(env)
+
+    font_normal = make_font("DejaVuSansMono.ttf", 10)
+    font_bold = make_font("DejaVuSansMono-Bold.ttf", 12)
+    awesome_font = make_font("fontawesome-webfont.ttf", 12)
+
+    with canvas(device) as draw:
+        draw.text((5, 0), "\uf072", font=awesome_font, fill="white")
+        draw.text((20, 0), callsign.callsign, font=font_bold, fill="white")
+        draw.text((5, 15), f"Alt: {position.altitude} ft", font=font_normal, fill="white")
+        draw.text((5, 25), f"Dist: {position.distance} km", font=font_normal, fill="white")
+        draw.text((5, 35), f"Type: {callsign.typecode}", font=font_normal, fill="white")
+        draw.text((5, 45), f"Reg: {callsign.registration}", font=font_normal, fill="white")
+
+    if env == 'development':
+        device.show()
+
+
+def main():
     try:
         load_dotenv()
         aircraft_data = load_aircraft_data()
@@ -194,6 +215,11 @@ if __name__ == "__main__":
                     handle_transmission_type_1(message)
                 elif message.message_type == "MSG" and message.transmission_type == '3':
                     handle_transmission_type_3(message)
+                    display_closest_aircraft()
 
     except KeyboardInterrupt:
         pass
+
+
+if __name__ == "__main__":
+    main()
