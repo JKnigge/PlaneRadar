@@ -3,6 +3,7 @@ import datetime
 import os
 from io import StringIO
 from pathlib import Path
+import socket
 
 import requests
 from dotenv import load_dotenv
@@ -175,16 +176,24 @@ if __name__ == "__main__":
     try:
         load_dotenv()
         aircraft_data = load_aircraft_data()
-        while True:
-            print("Please input:")
-            raw_message = input()
-            print("Processing input")
-            message = SBSMessage(raw_message, aircraft_data)
 
-            if message.message_type == "MSG" and message.transmission_type == '1':
-                handle_transmission_type_1(message)
-            elif message.message_type == "MSG" and message.transmission_type == '3':
-                handle_transmission_type_3(message)
+        HOST = os.getenv("1090_HOST")
+        PORT = int(os.getenv("1090_PORT"))
+
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((HOST, PORT))
+
+            while True:
+                data = s.recv(1024)
+                if not data:
+                    break
+                raw_message = data.decode('utf-8')
+                print(raw_message)  # Example processing: decode and print the data
+                message = SBSMessage(raw_message, aircraft_data)
+                if message.message_type == "MSG" and message.transmission_type == '1':
+                    handle_transmission_type_1(message)
+                elif message.message_type == "MSG" and message.transmission_type == '3':
+                    handle_transmission_type_3(message)
 
     except KeyboardInterrupt:
         pass
