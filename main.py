@@ -158,8 +158,12 @@ def save_closest_aircraft(position_message: Positions):
     global closest_aircraft
     if (closest_aircraft is None
             or closest_aircraft.hex_ident == position_message.hex_ident
-            or position_message.distance < closest_aircraft.distance):
+            or distance_adjusted_by_altitude_penalty(position_message) < distance_adjusted_by_altitude_penalty(closest_aircraft)):
         closest_aircraft = position_message
+
+
+def distance_adjusted_by_altitude_penalty(position_message: Positions) -> bool:
+    return position_message.distance if int(position_message.altitude) < 10000 else position_message.distance + 20
 
 
 def display_closest_aircraft():
@@ -209,11 +213,12 @@ def main():
                 if not data:
                     break
                 raw_message = data.decode('utf-8')
-                print(raw_message)  # Example processing: decode and print the data
                 message = SBSMessage(raw_message, aircraft_data)
                 if message.message_type == "MSG" and message.transmission_type == '1':
+                    print(raw_message)
                     handle_transmission_type_1(message)
                 elif message.message_type == "MSG" and message.transmission_type == '3':
+                    print(raw_message)
                     handle_transmission_type_3(message)
                     display_closest_aircraft()
 
