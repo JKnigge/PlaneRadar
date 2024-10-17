@@ -1,5 +1,6 @@
 import csv
 import datetime
+import math
 import os
 from io import StringIO
 from pathlib import Path
@@ -158,7 +159,8 @@ def save_closest_aircraft(position_message: Positions):
     global closest_aircraft
     if (closest_aircraft is None
             or closest_aircraft.hex_ident == position_message.hex_ident
-            or distance_adjusted_by_altitude_penalty(position_message) < distance_adjusted_by_altitude_penalty(closest_aircraft)):
+            or distance_adjusted_by_altitude_penalty(position_message) < distance_adjusted_by_altitude_penalty(
+                closest_aircraft)):
         closest_aircraft = position_message
 
 
@@ -192,9 +194,59 @@ def write_on_screen(callsign: Callsigns, position: Positions):
         draw.text((5, 25), f"Dist: {position.distance} km", font=font_normal, fill="white")
         draw.text((5, 35), f"Type: {callsign.typecode}", font=font_normal, fill="white")
         draw.text((5, 45), f"Reg: {callsign.registration}", font=font_normal, fill="white")
+        draw_small_compass(draw, 110, 40, position.bearing)
 
     if env == 'development':
         device.show()
+
+
+def draw_small_compass(draw, center_x, center_y, bearing_rad):
+    radius = 12
+    arrow_length = 4
+
+    font = make_font("DejaVuSansMono.ttf", 10)
+
+    draw.ellipse((center_x - radius, center_y - radius, center_x + radius, center_y + radius), outline="white")
+
+    for angle in range(0, 360, 90):
+
+        angle_rad = math.radians(angle)
+
+        outer_x = center_x + (radius + 1) * math.sin(angle_rad)
+        outer_y = center_y - (radius + 1) * math.cos(angle_rad)
+
+        inner_x = center_x + (radius - 3) * math.sin(angle_rad)
+        inner_y = center_y - (radius - 3) * math.cos(angle_rad)
+
+        draw.line((inner_x, inner_y, outer_x, outer_y), fill="white", width=1)
+
+        arrow_x = center_x + (radius + arrow_length) * math.sin(bearing_rad)
+        arrow_y = center_y - (radius + arrow_length) * math.cos(bearing_rad)
+
+        draw.line((center_x + (radius-1) * math.sin(bearing_rad),
+                   center_y - (radius-1) * math.cos(bearing_rad),
+                   arrow_x, arrow_y), fill="white", width=1)
+
+    draw.text((center_x - 3, center_y - radius - 12), "N", fill="white", font=font)
+
+    bearing_deg = math.degrees(bearing_rad) % 360
+    bearing_text = to_string_with_leading_zero(int(bearing_deg))
+
+    text_bbox = draw.textbbox((0, 0), bearing_text, font=font)
+    text_width = text_bbox[2] - text_bbox[0]
+    text_height = text_bbox[3] - text_bbox[1]
+
+    draw.text((center_x - text_width // 2, center_y - 10 // 2), bearing_text, fill="white", font=font)
+
+
+def to_string_with_leading_zero(number: int) -> str:
+    normalized_bearing_deg = number % 360
+    output = ""
+    if number < 10:
+        output = output + "0"
+    if number < 100:
+        output = output + "0"
+    return output + str(number)
 
 
 def main():
