@@ -207,20 +207,19 @@ def main():
 
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((HOST, PORT))
-
-            while True:
-                data = s.recv(1024)
-                if not data:
-                    break
-                raw_message = data.decode('utf-8')
-                message = SBSMessage(raw_message, aircraft_data)
-                if message.message_type == "MSG" and message.transmission_type == '1':
-                    print(raw_message)
-                    handle_transmission_type_1(message)
-                elif message.message_type == "MSG" and message.transmission_type == '3':
-                    print(raw_message)
-                    handle_transmission_type_3(message)
-                    display_closest_aircraft()
+            with s.makefile() as f:
+                while True:
+                    raw_message = f.readline()
+                    if not raw_message:
+                        break
+                    message = SBSMessage(raw_message, aircraft_data)
+                    if message.message_type == "MSG" and message.transmission_type == '1':
+                        print(raw_message)
+                        handle_transmission_type_1(message)
+                    elif message.message_type == "MSG" and message.transmission_type == '3':
+                        print(raw_message)
+                        handle_transmission_type_3(message)
+                        display_closest_aircraft()
 
     except KeyboardInterrupt:
         pass

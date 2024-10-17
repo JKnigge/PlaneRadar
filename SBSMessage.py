@@ -3,6 +3,7 @@ from datetime import datetime
 
 class SBSMessage:
     def __init__(self, raw_message, aircraft_data):
+        raw_message = raw_message.replace(" ", "")
         fields = raw_message.split(",")
         try:
             self.message_type = fields[0]
