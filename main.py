@@ -143,11 +143,13 @@ def calculate_distance(plane_postion_in_radians: (float, float), observer_positi
     return distance
 
 
-def calculate_bearing(plane_postion_in_radians: (float, float), observer_position: (float, float)) -> float:
-    F0 = cos(observer_position[0])  # local conversion for spherical coordinates
-    bearing = round(atan2(plane_postion_in_radians[0] - observer_position[0],
-                          F0 * (plane_postion_in_radians[1] - observer_position[1])), 2)
-    return bearing
+def calculate_bearing(plane_position_in_radians: (float, float), observer_position: (float, float)) -> float:
+    delta_lat = plane_position_in_radians[0] - observer_position[0]
+    delta_lon = plane_position_in_radians[1] - observer_position[1]
+    F0 = math.cos(observer_position[0])
+
+    bearing_rad = math.atan2(delta_lon * F0, delta_lat)
+    return bearing_rad
 
 
 def get_observer_location_in_degrees() -> (float, float):
@@ -210,7 +212,6 @@ def draw_small_compass(draw, center_x, center_y, bearing_rad):
     draw.ellipse((center_x - radius, center_y - radius, center_x + radius, center_y + radius), outline="white")
 
     for angle in range(0, 360, 90):
-
         angle_rad = math.radians(angle)
 
         outer_x = center_x + (radius + 1) * math.sin(angle_rad)
@@ -224,13 +225,13 @@ def draw_small_compass(draw, center_x, center_y, bearing_rad):
         arrow_x = center_x + (radius + arrow_length) * math.sin(bearing_rad)
         arrow_y = center_y - (radius + arrow_length) * math.cos(bearing_rad)
 
-        draw.line((center_x + (radius-1) * math.sin(bearing_rad),
-                   center_y - (radius-1) * math.cos(bearing_rad),
+        draw.line((center_x + (radius - 1) * math.sin(bearing_rad),
+                   center_y - (radius - 1) * math.cos(bearing_rad),
                    arrow_x, arrow_y), fill="white", width=1)
 
     draw.text((center_x - 3, center_y - radius - 12), "N", fill="white", font=font)
 
-    bearing_deg = math.degrees(bearing_rad) % 360
+    bearing_deg = round(math.degrees(bearing_rad) % 360, 2)
     bearing_text = to_string_with_leading_zero(int(bearing_deg))
 
     text_bbox = draw.textbbox((0, 0), bearing_text, font=font)
@@ -240,7 +241,6 @@ def draw_small_compass(draw, center_x, center_y, bearing_rad):
 
 
 def to_string_with_leading_zero(number: int) -> str:
-    normalized_bearing_deg = number % 360
     output = ""
     if number < 10:
         output = output + "0"
