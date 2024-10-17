@@ -18,8 +18,6 @@ from math import radians, sqrt, atan2, cos
 from SBSMessage import SBSMessage
 from database_models import Callsigns, Positions
 
-SCREEN_TIME_IN_SECONDS = 5
-
 R0 = 6371.0
 
 closest_aircraft = None
@@ -85,6 +83,9 @@ def handle_transmission_type_1(message: SBSMessage):
     callsign.last_message_generated = message.get_generated_datetime()
     callsign.last_message_received = datetime.datetime.now()
     callsign.num_messages = callsign.num_messages + 1
+    callsign.registration = message.registration
+    callsign.typecode = message.typecode
+    callsign.operator = message.operator
     callsign.save()
 
 
@@ -234,7 +235,6 @@ def draw_small_compass(draw, center_x, center_y, bearing_rad):
 
     text_bbox = draw.textbbox((0, 0), bearing_text, font=font)
     text_width = text_bbox[2] - text_bbox[0]
-    text_height = text_bbox[3] - text_bbox[1]
 
     draw.text((center_x - text_width // 2, center_y - 10 // 2), bearing_text, fill="white", font=font)
 
