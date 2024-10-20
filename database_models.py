@@ -33,5 +33,6 @@ class Positions(BaseModel):
     bearing = FloatField(null=True)
     message_generated = DateTimeField(null=True)
     message_received = DateTimeField()
+    num_message = IntegerField()
 
 
