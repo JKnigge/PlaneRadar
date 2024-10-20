@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS `callsigns` (
   `typecode` varchar(50) DEFAULT NULL,
   `operator` varchar(50) DEFAULT NULL,
   `num_messages` int NOT NULL DEFAULT '0',
+  `closest_dist` float DEFAULT NULL,
+  `lowest_alt` int DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 

@@ -19,7 +19,7 @@ from SBSMessage import SBSMessage
 from database_models import Callsigns, Positions
 
 R0 = 6371.0
-PREF_ALT_LIMIT = 15000 #planes below this altitude will be preferred for the display.
+PREF_ALT_LIMIT = 15000  #planes below this altitude will be preferred for the display.
 
 closest_aircraft = None
 
@@ -108,28 +108,47 @@ def handle_transmission_type_3(message: SBSMessage):
     callsign = get_last_callsign_during_last_hour_for(message.hex_ident)
     if callsign is None:
         return
-    positon_0 = Positions.select().where(Positions.callsign_id == callsign.id).first()
-    if positon_0 is None:
-        create_position_entry(callsign, message, 0)
-    else:
-        position_i = Positions.select().where(
-            (Positions.callsign_id == callsign.id) & (Positions.num_message > 0)).first()
-        if position_i is None:
-            create_position_entry(callsign, message, 1)
+    try:
+        plane_postion_in_radians = (radians(float(message.latitude)), radians(float(message.longitude)))
+        observer_position = get_observer_location_in_degrees()
+        distance = calculate_distance(plane_postion_in_radians, observer_position)
+        bearing = calculate_bearing(plane_postion_in_radians, observer_position)
+        position_0 = Positions.select().where(Positions.callsign_id == callsign.id).first()
+        if position_0 is None:
+            create_position_entry(callsign, message, distance, bearing, 0)
         else:
-            update_position_entry(position_i, message)
+            position_i = Positions.select().where(
+                (Positions.callsign_id == callsign.id) & (Positions.num_message > 0)).first()
+            if position_i is None:
+                create_position_entry(callsign, message, distance, bearing,1)
+            else:
+                update_position_entry(position_i, message, distance, bearing)
+        save_closest_distance(callsign, distance)
+        save_lowest_altitude(callsign, int(message.altitude))
+
+    except ValueError:
+        pass
 
 
-def update_position_entry(position: Positions, message: SBSMessage):
-    plane_postion_in_radians = (radians(float(message.latitude)), radians(float(message.longitude)))
-    observer_position = get_observer_location_in_degrees()
+def save_closest_distance(callsign: Callsigns, distance: float):
+    if callsign.closest_dist is None or callsign.closest_dist > distance:
+        callsign.closest_dist = distance
+        callsign.save()
+
+
+def save_lowest_altitude(callsign: Callsigns, height: int):
+    if callsign.lowest_alt is None or callsign.lowest_alt > height:
+        callsign.lowest_alt = height
+        callsign.save()
+
+def update_position_entry(position: Positions, message: SBSMessage, distance: float, bearing: float):
     try:
         position.hex_ident = message.hex_ident
         position.latitude = message.latitude
         position.longitude = message.longitude
         position.altitude = message.altitude
-        position.distance = calculate_distance(plane_postion_in_radians, observer_position)
-        position.bearing = calculate_bearing(plane_postion_in_radians, observer_position)
+        position.distance = distance
+        position.bearing = bearing
         position.message_generated = message.get_generated_datetime()
         position.num_message = position.num_message + 1
 
@@ -140,18 +159,16 @@ def update_position_entry(position: Positions, message: SBSMessage):
         pass
 
 
-def create_position_entry(callsign: Callsigns, message: SBSMessage, num: int):
+def create_position_entry(callsign: Callsigns, message: SBSMessage, distance: float, bearing: float, num: int):
     try:
-        plane_postion_in_radians = (radians(float(message.latitude)), radians(float(message.longitude)))
-        observer_position = get_observer_location_in_degrees()
         position = Positions(
             hex_ident=message.hex_ident,
             callsign_id=callsign.id,
             latitude=message.latitude,
             longitude=message.longitude,
             altitude=message.altitude,
-            distance=calculate_distance(plane_postion_in_radians, observer_position),
-            bearing=calculate_bearing(plane_postion_in_radians, observer_position),
+            distance=distance,
+            bearing=bearing,
             message_generated=message.get_generated_datetime(),
             num_message=num
         )
@@ -203,7 +220,8 @@ def save_closest_aircraft(position_message: Positions):
 
 
 def distance_adjusted_by_altitude_penalty(position_message: Positions) -> bool:
-    return position_message.distance if int(position_message.altitude) < PREF_ALT_LIMIT else position_message.distance + 20
+    return position_message.distance if int(
+        position_message.altitude) < PREF_ALT_LIMIT else position_message.distance + 20
 
 
 def display_closest_aircraft():

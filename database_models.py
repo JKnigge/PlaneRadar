@@ -20,6 +20,8 @@ class Callsigns(BaseModel):
     typecode = CharField(null=True)
     operator = CharField(null=True)
     num_messages = IntegerField()
+    closest_dist = FloatField(null=True)
+    lowest_alt = IntegerField(null = True)
 
 
 class Positions(BaseModel):
