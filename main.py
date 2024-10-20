@@ -19,6 +19,7 @@ from SBSMessage import SBSMessage
 from database_models import Callsigns, Positions
 
 R0 = 6371.0
+PREF_ALT_LIMIT = 15000 #planes below this altitude will be preferred for the display.
 
 closest_aircraft = None
 
@@ -202,7 +203,7 @@ def save_closest_aircraft(position_message: Positions):
 
 
 def distance_adjusted_by_altitude_penalty(position_message: Positions) -> bool:
-    return position_message.distance if int(position_message.altitude) < 10000 else position_message.distance + 20
+    return position_message.distance if int(position_message.altitude) < PREF_ALT_LIMIT else position_message.distance + 20
 
 
 def display_closest_aircraft():
