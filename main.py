@@ -1,3 +1,4 @@
+import argparse
 import csv
 import datetime
 import math
@@ -51,7 +52,17 @@ def read_aircraft_data(file_content):
     )
 
 
-def load_aircraft_data():
+def get_aircraft_data(download_file: bool):
+    if download_file:
+        print("Downloading...")
+        return download_aircraft_data()
+    else:
+        print("Taking local file...")
+        local_file = "aircraftDatabase.csv"
+        with open(local_file, "r") as f:
+            return read_aircraft_data(f)
+
+def download_aircraft_data():
     url = "https://opensky-network.org/datasets/metadata/aircraftDatabase.csv"
 
     # Path to the fallback local CSV file
@@ -302,10 +313,10 @@ def to_string_with_leading_zero(number: int) -> str:
     return output + str(number)
 
 
-def main():
+def main(download_file: bool):
     try:
         load_dotenv()
-        aircraft_data = load_aircraft_data()
+        aircraft_data = get_aircraft_data(download_file)
 
         HOST = os.getenv("1090_HOST")
         PORT = int(os.getenv("1090_PORT"))
@@ -331,4 +342,14 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Downloads the aircraft database file or uses a local copy.")
+
+    parser.add_argument(
+        "-d", "--download",
+        action="store_true",
+        help="Download the aircrafDatabase file before running"
+    )
+
+    args = parser.parse_args()
+
+    main(args.download)
