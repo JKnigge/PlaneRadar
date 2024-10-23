@@ -1,0 +1,12 @@
+[Unit]
+Description=Python script to read ADS-B messages
+After=dump1090.service
+
+[Service]
+WorkingDirectory=/home/pi/Coding/PlaneRadar/
+ExecStart=/bin/bash -c "source /home/pi/Coding/PlaneRadar/venv/bin/activate && python /home/pi/Coding/PlaneRadar/main.p -s 4>
+Restart=always
+User=pi
+
+[Install]
+WantedBy=multi-user.target
