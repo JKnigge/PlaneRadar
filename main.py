@@ -23,6 +23,7 @@ R0 = 6371.0
 PREF_ALT_LIMIT_IN_FEET = 15000  #planes below this altitude will be preferred for the display.
 
 closest_aircraft = None
+last_screen_update = None
 
 
 def get_device(env):
@@ -235,6 +236,26 @@ def distance_adjusted_by_altitude_penalty(position_message: Positions) -> bool:
         position_message.altitude) < PREF_ALT_LIMIT_IN_FEET else position_message.distance + 20
 
 
+def update_screen(screentime_in_seconds: int):
+    global last_screen_update
+
+    if screentime_in_seconds < 1:
+        display_closest_aircraft()
+        return
+
+    if last_screen_update is None:
+        last_screen_update = datetime.datetime.now()
+        display_closest_aircraft()
+        return
+
+    time_now = datetime.datetime.now()
+    timediff = time_now - last_screen_update
+
+    if timediff > datetime.timedelta(seconds=screentime_in_seconds):
+        last_screen_update = time_now
+        display_closest_aircraft()
+
+
 def display_closest_aircraft():
     global closest_aircraft
     if closest_aircraft is None:
@@ -313,7 +334,7 @@ def to_string_with_leading_zero(number: int) -> str:
     return output + str(number)
 
 
-def main(download_file: bool):
+def main(download_file: bool, screentime: int):
     try:
         load_dotenv()
         aircraft_data = get_aircraft_data(download_file)
@@ -335,21 +356,27 @@ def main(download_file: bool):
                     elif message.message_type == "MSG" and message.transmission_type == '3':
                         print(raw_message)
                         handle_transmission_type_3(message)
-                        display_closest_aircraft()
+                        update_screen(screentime)
 
     except KeyboardInterrupt:
         pass
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Downloads the aircraft database file or uses a local copy.")
+    parser = argparse.ArgumentParser(description="Downloads the aircraft database file or uses a local copy. Updates the screen display.")
 
     parser.add_argument(
         "-d", "--download",
         action="store_true",
         help="Download the aircrafDatabase file before running"
     )
+    parser.add_argument(
+        "-s", "--screentime",
+        type=int,
+        default=2,
+        help="Set the wait time in seconds between screen refreshs. Can also be set to 0 for immediate refresh (default: 2)."
+    )
 
     args = parser.parse_args()
 
-    main(args.download)
+    main(args.download, args.screentime)
