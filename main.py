@@ -8,11 +8,11 @@ from pathlib import Path
 import socket
 
 import requests
-from PIL import ImageDraw, Image
 from dotenv import load_dotenv
 from luma.core.interface.serial import i2c
 from luma.emulator.device import pygame
 from luma.oled.device import sh1106  # For real LCD screen
+from luma.core.render import canvas
 from PIL import ImageFont
 from math import radians, sqrt, atan2, cos
 
@@ -275,18 +275,14 @@ def write_on_screen(callsign: Callsigns, position: Positions):
     font_bold = make_font("DejaVuSansMono-Bold.ttf", 12)
     awesome_font = make_font("fontawesome-webfont.ttf", 12)
 
-    image = Image.new('1', (device.width, device.height))
-    draw = ImageDraw.Draw(image)
-
-    draw.text((5, 0), "\uf072", font=awesome_font, fill="white")
-    draw.text((20, 0), callsign.callsign, font=font_bold, fill="white")
-    draw.text((5, 15), f"Alt: {position.altitude} ft", font=font_normal, fill="white")
-    draw.text((5, 25), f"Dist: {position.distance} km", font=font_normal, fill="white")
-    draw.text((5, 35), f"Type: {callsign.typecode}", font=font_normal, fill="white")
-    draw.text((5, 45), f"Reg: {callsign.registration}", font=font_normal, fill="white")
-    draw_small_compass(draw, 110, 40, position.bearing)
-
-    device.display(image)
+    with canvas(device) as draw:
+        draw.text((5, 0), "\uf072", font=awesome_font, fill="white")
+        draw.text((20, 0), callsign.callsign, font=font_bold, fill="white")
+        draw.text((5, 15), f"Alt: {position.altitude} ft", font=font_normal, fill="white")
+        draw.text((5, 25), f"Dist: {position.distance} km", font=font_normal, fill="white")
+        draw.text((5, 35), f"Type: {callsign.typecode}", font=font_normal, fill="white")
+        draw.text((5, 45), f"Reg: {callsign.registration}", font=font_normal, fill="white")
+        draw_small_compass(draw, 110, 40, position.bearing)
 
     if env == 'development':
         device.show()
