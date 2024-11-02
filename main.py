@@ -12,9 +12,9 @@ from dotenv import load_dotenv
 from luma.core.interface.serial import i2c
 from luma.emulator.device import pygame
 from luma.oled.device import sh1106  # For real LCD screen
-from luma.core.render import canvas
 from PIL import ImageFont
 from math import radians, sqrt, atan2, cos
+from PIL import ImageDraw, Image
 
 from SBSMessage import SBSMessage
 from database_models import Callsigns, Positions
@@ -236,7 +236,7 @@ def distance_adjusted_by_altitude_penalty(position_message: Positions) -> bool:
         position_message.altitude) < PREF_ALT_LIMIT_IN_FEET else position_message.distance + 20
 
 
-def update_screen(screentime_in_seconds: int):
+def update_screen(screentime_in_seconds: int, keepon: bool):
     global last_screen_update
 
     if screentime_in_seconds < 1:
@@ -253,20 +253,20 @@ def update_screen(screentime_in_seconds: int):
 
     if timediff > datetime.timedelta(seconds=screentime_in_seconds):
         last_screen_update = time_now
-        display_closest_aircraft()
+        display_closest_aircraft(keepon)
 
 
-def display_closest_aircraft():
+def display_closest_aircraft(keepon: bool):
     global closest_aircraft
     if closest_aircraft is None:
         return
     callsign = get_last_callsign_during_last_hour_for(closest_aircraft.hex_ident)
     if callsign is None:
         return
-    write_on_screen(callsign, closest_aircraft)
+    write_on_screen(callsign, closest_aircraft, keepon)
 
 
-def write_on_screen(callsign: Callsigns, position: Positions):
+def write_on_screen(callsign: Callsigns, position: Positions, keepon: bool):
     env = os.getenv('ENVIRONMENT', 'development')
 
     device = get_device(env)
@@ -275,14 +275,21 @@ def write_on_screen(callsign: Callsigns, position: Positions):
     font_bold = make_font("DejaVuSansMono-Bold.ttf", 12)
     awesome_font = make_font("fontawesome-webfont.ttf", 12)
 
-    with canvas(device) as draw:
-        draw.text((5, 0), "\uf072", font=awesome_font, fill="white")
-        draw.text((20, 0), callsign.callsign, font=font_bold, fill="white")
-        draw.text((5, 15), f"Alt: {position.altitude} ft", font=font_normal, fill="white")
-        draw.text((5, 25), f"Dist: {position.distance} km", font=font_normal, fill="white")
-        draw.text((5, 35), f"Type: {callsign.typecode}", font=font_normal, fill="white")
-        draw.text((5, 45), f"Reg: {callsign.registration}", font=font_normal, fill="white")
-        draw_small_compass(draw, 110, 40, position.bearing)
+    image = Image.new('1', (device.width, device.height))
+    draw = ImageDraw.Draw(image)
+
+    draw.text((5, 0), "\uf072", font=awesome_font, fill="white")
+    draw.text((20, 0), callsign.callsign, font=font_bold, fill="white")
+    draw.text((5, 15), f"Alt: {position.altitude} ft", font=font_normal, fill="white")
+    draw.text((5, 25), f"Dist: {position.distance} km", font=font_normal, fill="white")
+    draw.text((5, 35), f"Type: {callsign.typecode}", font=font_normal, fill="white")
+    draw.text((5, 45), f"Reg: {callsign.registration}", font=font_normal, fill="white")
+    draw_small_compass(draw, 110, 40, position.bearing)
+
+    device.display(image)
+
+    if keepon:
+        device.command(0xAF)
 
     if env == 'development':
         device.show()
@@ -334,7 +341,7 @@ def to_string_with_leading_zero(number: int) -> str:
     return output + str(number)
 
 
-def main(download_file: bool, screentime: int):
+def main(download_file: bool, screentime: int, keepon: bool):
     try:
         load_dotenv()
         aircraft_data = get_aircraft_data(download_file)
@@ -356,7 +363,7 @@ def main(download_file: bool, screentime: int):
                     elif message.message_type == "MSG" and message.transmission_type == '3':
                         print(raw_message)
                         handle_transmission_type_3(message)
-                        update_screen(screentime)
+                        update_screen(screentime, keepon)
 
     except KeyboardInterrupt:
         pass
@@ -371,6 +378,11 @@ if __name__ == "__main__":
         help="Download the aircrafDatabase file before running"
     )
     parser.add_argument(
+        "-k", "--keepon",
+        action="store_true",
+        help="Set to keep the screen on."
+    )
+    parser.add_argument(
         "-s", "--screentime",
         type=int,
         default=2,
@@ -379,4 +391,4 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    main(args.download, args.screentime)
+    main(args.download, args.screentime, args.keepon)
