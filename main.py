@@ -354,6 +354,8 @@ def main(download_file: bool, screentime: int, keepon: bool):
         load_dotenv()
         aircraft_data = get_aircraft_data(download_file)
 
+        print("Aircraft data loaded.")
+
         HOST = os.getenv("1090_HOST")
         PORT = int(os.getenv("1090_PORT"))
 
