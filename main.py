@@ -1,4 +1,5 @@
 import argparse
+import csv
 import datetime
 import math
 import os
@@ -14,7 +15,6 @@ from luma.oled.device import sh1106  # For real LCD screen
 from PIL import ImageFont
 from math import radians, sqrt, atan2, cos
 from PIL import ImageDraw, Image
-import pandas as pd
 
 from SBSMessage import SBSMessage
 from database_models import Callsigns, Positions
@@ -40,25 +40,17 @@ def make_font(name, size):
     return ImageFont.truetype(font_path, size)
 
 
-def read_aircraft_data(local_file):
-    aircraft_data = {}
-
-    for chunk in pd.read_csv(local_file, chunksize=1000):
-        # Filter out rows where "icao24" is empty
-        chunk = chunk[chunk["icao24"].notna()]
-
-        # Convert each chunk to the desired dictionary structure and update the main dictionary
-        chunk_dict = {
-            row["icao24"]: {
-                "registration": row["registration"],
-                "typecode": row["typecode"],
-                "operator": row["operatoricao"]
+def read_aircraft_data(file_content):
+    return dict(
+        (
+            line["icao24"],
+            {
+                "registration": line["registration"],
+                "typecode": line["typecode"],
+                "operator": line["operatoricao"]
             }
-            for _, row in chunk.iterrows()
-        }
-        aircraft_data.update(chunk_dict)
-
-    return aircraft_data
+        ) for line in csv.DictReader(file_content) if line["icao24"] != ""
+    )
 
 
 def get_aircraft_data(download_file: bool):
@@ -248,7 +240,7 @@ def update_screen(screentime_in_seconds: int, keepon: bool):
     global last_screen_update
 
     if screentime_in_seconds < 1:
-        display_closest_aircraft()
+        display_closest_aircraft(keepon)
         return
 
     if last_screen_update is None:
@@ -400,4 +392,5 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+
     main(args.download, args.screentime, args.keepon)
