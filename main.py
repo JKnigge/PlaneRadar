@@ -278,12 +278,12 @@ def write_on_screen(callsign: Callsigns, position: Positions, keepon: bool):
     image = Image.new('1', (device.width, device.height))
     draw = ImageDraw.Draw(image)
 
-    draw.text((5, 0), "\uf072", font=awesome_font, fill="white")
-    draw.text((20, 0), callsign.callsign, font=font_bold, fill="white")
-    draw.text((5, 15), f"Alt: {position.altitude} ft", font=font_normal, fill="white")
-    draw.text((5, 25), f"Dist: {position.distance} km", font=font_normal, fill="white")
-    draw.text((5, 35), f"Type: {callsign.typecode}", font=font_normal, fill="white")
-    draw.text((5, 45), f"Reg: {callsign.registration}", font=font_normal, fill="white")
+    draw.text((5, 5), "\uf072", font=awesome_font, fill="white")
+    draw.text((20, 5), callsign.callsign, font=font_bold, fill="white")
+    draw.text((5, 20), f"Alt: {position.altitude} ft", font=font_normal, fill="white")
+    draw.text((5, 30), f"Dist: {position.distance} km", font=font_normal, fill="white")
+    draw.text((5, 40), f"Type: {callsign.typecode}", font=font_normal, fill="white")
+    draw.text((5, 50), f"Reg: {callsign.registration}", font=font_normal, fill="white")
     draw_small_compass(draw, 110, 40, position.bearing)
 
     device.display(image)
