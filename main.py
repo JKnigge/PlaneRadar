@@ -13,15 +13,25 @@ from luma.core.interface.serial import i2c
 from luma.emulator.device import pygame
 from luma.oled.device import sh1106  # For real LCD screen
 from PIL import ImageFont
-from math import radians, sqrt, atan2, cos
+from math import radians, sqrt, cos
 from PIL import ImageDraw, Image
 
 from SBSMessage import SBSMessage
 from database_models import Callsigns, Positions
 
+###############################################################################################
+# Global Settings
+###############################################################################################
+
+# Pins
 SCREEN_SWITCH_PIN = 23
+# Other Values
 R0 = 6371.0
 PREF_ALT_LIMIT_IN_FEET = 15000  #planes below this altitude will be preferred for the display.
+
+###############################################################################################
+# Program Code
+###############################################################################################
 
 closest_aircraft = None
 last_screen_update = None
