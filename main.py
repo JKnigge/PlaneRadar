@@ -25,6 +25,9 @@ from database_models import Callsigns, Positions
 
 # Pins
 SCREEN_SWITCH_PIN = 23
+LED_RED_PIN = 17
+LED_GREEN_PIN = 27
+
 # Other Values
 R0 = 6371.0
 PREF_ALT_LIMIT_IN_FEET = 15000  #planes below this altitude will be preferred for the display.
@@ -47,6 +50,8 @@ else:
 
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(SCREEN_SWITCH_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(LED_RED_PIN, GPIO.OUT)
+GPIO.setup(LED_GREEN_PIN, GPIO.OUT)
 
 if ENVIRONMENT == 'development':
     device = pygame(width=128, height=64, rotate=0)
@@ -376,6 +381,16 @@ def to_string_with_leading_zero(number: int) -> str:
     return output + str(number)
 
 
+def turn_only_red_led_on():
+    GPIO.output(LED_RED_PIN, True)
+    GPIO.output(LED_GREEN_PIN, False)
+
+
+def turn_only_green_led_on():
+    GPIO.output(LED_RED_PIN, False)
+    GPIO.output(LED_GREEN_PIN, True)
+
+
 def main(download_file: bool, screentime: int, keepon: bool):
     try:
         aircraft_data = get_aircraft_data(download_file)
@@ -389,6 +404,7 @@ def main(download_file: bool, screentime: int, keepon: bool):
             s.connect((HOST, PORT))
             with s.makefile() as f:
                 while True:
+                    turn_only_green_led_on()
                     raw_message = f.readline()
                     if not raw_message:
                         break
@@ -397,6 +413,7 @@ def main(download_file: bool, screentime: int, keepon: bool):
                         print(raw_message)
                         handle_transmission_type_1(message)
                     elif message.message_type == "MSG" and message.transmission_type == '3':
+                        turn_only_red_led_on()
                         print(raw_message)
                         handle_transmission_type_3(message)
                         update_screen(screentime, keepon)
