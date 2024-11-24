@@ -19,20 +19,30 @@ from PIL import ImageDraw, Image
 from SBSMessage import SBSMessage
 from database_models import Callsigns, Positions
 
+SCREEN_SWITCH_PIN = 23
 R0 = 6371.0
 PREF_ALT_LIMIT_IN_FEET = 15000  #planes below this altitude will be preferred for the display.
 
 closest_aircraft = None
 last_screen_update = None
 
+load_dotenv()
 
-def get_device(env):
-    if env == 'development':
-        device = pygame(width=128, height=64, rotate=0)
-    else:
-        serial = i2c(port=1, address=0x3C)
-        device = sh1106(serial)
-    return device
+ENVIRONMENT = os.getenv("ENVIRONMENT")
+
+if ENVIRONMENT == "development":
+    import Mock.GPIO as GPIO
+else:
+    import RPi.GPIO as GPIO
+
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(SCREEN_SWITCH_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+if ENVIRONMENT == 'development':
+    device = pygame(width=128, height=64, rotate=0)
+else:
+    serial = i2c(port=1, address=0x3C)
+    device = sh1106(serial)
 
 
 def make_font(name, size):
@@ -62,6 +72,7 @@ def get_aircraft_data(download_file: bool):
         local_file = "aircraftDatabase.csv"
         with open(local_file, "r") as f:
             return read_aircraft_data(f)
+
 
 def download_aircraft_data():
     url = "https://opensky-network.org/datasets/metadata/aircraftDatabase.csv"
@@ -132,7 +143,7 @@ def handle_transmission_type_3(message: SBSMessage):
             position_i = Positions.select().where(
                 (Positions.callsign_id == callsign.id) & (Positions.num_message > 0)).first()
             if position_i is None:
-                create_position_entry(callsign, message, distance, bearing,1)
+                create_position_entry(callsign, message, distance, bearing, 1)
             else:
                 update_position_entry(position_i, message, distance, bearing)
         save_closest_distance(callsign, distance)
@@ -152,6 +163,7 @@ def save_lowest_altitude(callsign: Callsigns, height: int):
     if callsign.lowest_alt is None or callsign.lowest_alt > height:
         callsign.lowest_alt = height
         callsign.save()
+
 
 def update_position_entry(position: Positions, message: SBSMessage, distance: float, bearing: float):
     try:
@@ -237,6 +249,21 @@ def distance_adjusted_by_altitude_penalty(position_message: Positions) -> bool:
 
 
 def update_screen(screentime_in_seconds: int, keepon: bool):
+    switch_state = GPIO.input(SCREEN_SWITCH_PIN)
+    if switch_state == GPIO.HIGH or True:
+    if switch_state == GPIO.HIGH:
+        clear_screen()
+    else:
+        show_on_screen(screentime_in_seconds, keepon)
+
+
+def clear_screen():
+    global device
+    device.clear()
+    device.show()
+
+
+def show_on_screen(screentime_in_seconds: int, keepon: bool):
     global last_screen_update
 
     if screentime_in_seconds < 1:
@@ -267,9 +294,7 @@ def display_closest_aircraft(keepon: bool):
 
 
 def write_on_screen(callsign: Callsigns, position: Positions, keepon: bool):
-    env = os.getenv('ENVIRONMENT', 'development')
-
-    device = get_device(env)
+    global device
 
     font_normal = make_font("DejaVuSansMono.ttf", 10)
     font_bold = make_font("DejaVuSansMono-Bold.ttf", 12)
@@ -291,7 +316,7 @@ def write_on_screen(callsign: Callsigns, position: Positions, keepon: bool):
     if keepon:
         device.command(0xAF)
 
-    if env == 'development':
+    if ENVIRONMENT == 'development':
         device.show()
 
 
@@ -343,7 +368,6 @@ def to_string_with_leading_zero(number: int) -> str:
 
 def main(download_file: bool, screentime: int, keepon: bool):
     try:
-        load_dotenv()
         aircraft_data = get_aircraft_data(download_file)
 
         print("Aircraft data loaded.")
@@ -372,7 +396,8 @@ def main(download_file: bool, screentime: int, keepon: bool):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Downloads the aircraft database file or uses a local copy. Updates the screen display.")
+    parser = argparse.ArgumentParser(
+        description="Downloads the aircraft database file or uses a local copy. Updates the screen display.")
 
     parser.add_argument(
         "-d", "--download",
