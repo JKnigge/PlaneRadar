@@ -250,11 +250,11 @@ def distance_adjusted_by_altitude_penalty(position_message: Positions) -> bool:
 
 def update_screen(screentime_in_seconds: int, keepon: bool):
     switch_state = GPIO.input(SCREEN_SWITCH_PIN)
-    if switch_state == GPIO.HIGH or True:
+    print(f"Screen update. Switch state is {switch_state}.")
     if switch_state == GPIO.HIGH:
-        clear_screen()
-    else:
         show_on_screen(screentime_in_seconds, keepon)
+    else:
+        clear_screen()
 
 
 def clear_screen():
