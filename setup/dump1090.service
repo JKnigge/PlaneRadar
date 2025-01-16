@@ -3,7 +3,7 @@ Description=Dump1090 ADS-B receiver
 After=network.target
 
 [Service]
-ExecStart=/home/pi/Coding/dump1090/dump1090 --net --quiet
+ExecStart=/home/pi/dump1090/dump1090 --net --quiet
 Restart=always
 User=pi
 WorkingDirectory=/home/pi
