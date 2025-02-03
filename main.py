@@ -264,12 +264,8 @@ def distance_adjusted_by_altitude_penalty(position_message: Positions) -> bool:
 
 
 def update_screen(screentime_in_seconds: int, keepon: bool):
-    switch_state = GPIO.input(SCREEN_SWITCH_PIN)
-    print(f"Screen update. Switch state is {switch_state}.")
-    if switch_state == GPIO.HIGH:
-        show_on_screen(screentime_in_seconds, keepon)
-    else:
-        clear_screen()
+    show_on_screen(screentime_in_seconds, keepon)
+
 
 
 def clear_screen():
@@ -405,6 +401,10 @@ def main(download_file: bool, screentime: int, keepon: bool):
             with s.makefile() as f:
                 while True:
                     turn_only_green_led_on()
+                    switch_state = GPIO.input(SCREEN_SWITCH_PIN)
+                    print(f"Screen update. Switch state is {switch_state}.")
+                    if switch_state != GPIO.HIGH:
+                        clear_screen()
                     raw_message = f.readline()
                     if not raw_message:
                         break
@@ -416,7 +416,8 @@ def main(download_file: bool, screentime: int, keepon: bool):
                         turn_only_yellow_led_on()
                         print(raw_message)
                         handle_transmission_type_3(message)
-                        update_screen(screentime, keepon)
+                        if switch_state == GPIO.HIGH:
+                            update_screen(screentime, keepon)
 
     except KeyboardInterrupt:
         pass
