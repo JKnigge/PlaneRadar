@@ -48,6 +48,7 @@ if ENVIRONMENT == "development":
 else:
     import RPi.GPIO as GPIO
 
+GPIO.cleanup()
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(SCREEN_SWITCH_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 GPIO.setup(LED_YELLOW_PIN, GPIO.OUT)
@@ -421,6 +422,8 @@ def main(download_file: bool, screentime: int, keepon: bool):
 
     except KeyboardInterrupt:
         pass
+    finally:
+        GPIO.cleanup()
 
 
 if __name__ == "__main__":
