@@ -25,6 +25,7 @@ from database_models import Callsigns, Positions
 
 # Pins
 SCREEN_SWITCH_PIN = 23
+LOW_ALT_PRIO_SWITCH_PIN = 24
 LED_YELLOW_PIN = 27
 LED_GREEN_PIN = 17
 
@@ -51,6 +52,7 @@ else:
 GPIO.cleanup()
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(SCREEN_SWITCH_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(LOW_ALT_PRIO_SWITCH_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 GPIO.setup(LED_YELLOW_PIN, GPIO.OUT)
 GPIO.setup(LED_GREEN_PIN, GPIO.OUT)
 
@@ -258,6 +260,12 @@ def save_closest_aircraft(position_message: Positions):
                 closest_aircraft)):
         closest_aircraft = position_message
 
+def is_plane_closer(position_message: Positions, closest_aircraft: Positions) -> bool:
+    switch_state = GPIO.input(LOW_ALT_PRIO_SWITCH_PIN)
+    if(switch_state == GPIO.HIGH):
+        return distance_adjusted_by_altitude_penalty(position_message) < distance_adjusted_by_altitude_penalty(
+            closest_aircraft)
+    return position_message < closest_aircraft
 
 def distance_adjusted_by_altitude_penalty(position_message: Positions) -> bool:
     return position_message.distance if int(
@@ -317,6 +325,10 @@ def write_on_screen(callsign: Callsigns, position: Positions, keepon: bool):
     draw.text((5, 40), f"Type: {callsign.typecode}", font=font_normal, fill="white")
     draw.text((5, 50), f"Reg: {callsign.registration}", font=font_normal, fill="white")
     draw_small_compass(draw, 110, 40, position.bearing)
+
+    switch_state = GPIO.input(LOW_ALT_PRIO_SWITCH_PIN)
+    if (switch_state == GPIO.HIGH):
+        draw.text((105, 5), "\uf06e", font=awesome_font, fill="white")
 
     device.display(image)
 
