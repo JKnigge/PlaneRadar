@@ -264,11 +264,6 @@ def distance_adjusted_by_altitude_penalty(position_message: Positions) -> bool:
         position_message.altitude) < PREF_ALT_LIMIT_IN_FEET else position_message.distance + 20
 
 
-def update_screen(screentime_in_seconds: int, keepon: bool):
-    show_on_screen(screentime_in_seconds, keepon)
-
-
-
 def clear_screen():
     global device
     device.clear()
@@ -418,7 +413,7 @@ def main(download_file: bool, screentime: int, keepon: bool):
                         print(raw_message)
                         handle_transmission_type_3(message)
                         if switch_state == GPIO.HIGH:
-                            update_screen(screentime, keepon)
+                            show_on_screen(screentime, keepon)
 
     except KeyboardInterrupt:
         pass
