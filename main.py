@@ -266,7 +266,7 @@ def is_plane_closer(position_message: Positions, saved_closest_aircraft: Positio
     if switch_state == GPIO.HIGH:
         return distance_adjusted_by_altitude_penalty(position_message) < distance_adjusted_by_altitude_penalty(
             saved_closest_aircraft)
-    return position_message < saved_closest_aircraft
+    return position_message.distance < saved_closest_aircraft.distance
 
 
 def distance_adjusted_by_altitude_penalty(position_message: Positions) -> bool:
