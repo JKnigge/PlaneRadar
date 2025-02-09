@@ -256,16 +256,18 @@ def save_closest_aircraft(position_message: Positions):
     global closest_aircraft
     if (closest_aircraft is None
             or closest_aircraft.hex_ident == position_message.hex_ident
-            or distance_adjusted_by_altitude_penalty(position_message) < distance_adjusted_by_altitude_penalty(
-                closest_aircraft)):
+            or is_plane_closer(position_message, closest_aircraft)):
         closest_aircraft = position_message
 
-def is_plane_closer(position_message: Positions, closest_aircraft: Positions) -> bool:
+
+def is_plane_closer(position_message: Positions, saved_closest_aircraft: Positions or None) -> bool:
     switch_state = GPIO.input(LOW_ALT_PRIO_SWITCH_PIN)
-    if(switch_state == GPIO.HIGH):
+    print(f"Checking if plane is closer. Switch State is {switch_state}.")
+    if switch_state == GPIO.HIGH:
         return distance_adjusted_by_altitude_penalty(position_message) < distance_adjusted_by_altitude_penalty(
-            closest_aircraft)
-    return position_message < closest_aircraft
+            saved_closest_aircraft)
+    return position_message < saved_closest_aircraft
+
 
 def distance_adjusted_by_altitude_penalty(position_message: Positions) -> bool:
     return position_message.distance if int(
