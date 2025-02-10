@@ -325,6 +325,7 @@ def write_on_screen(callsign: Callsigns, position: Positions, keepon: bool):
     font_normal = make_font("DejaVuSansMono.ttf", 10)
     font_bold = make_font("DejaVuSansMono-Bold.ttf", 12)
     awesome_font = make_font("fontawesome-webfont.ttf", 12)
+    awesome_font_small = make_font("fontawesome-webfont.ttf", 10)
 
     image = Image.new('1', (device.width, device.height))
     draw = ImageDraw.Draw(image)
@@ -335,6 +336,9 @@ def write_on_screen(callsign: Callsigns, position: Positions, keepon: bool):
     draw.text((5, 30), f"Dist: {position.distance} km", font=font_normal, fill="white")
     draw.text((5, 40), f"Type: {callsign.typecode}", font=font_normal, fill="white")
     draw.text((5, 50), f"Reg: {callsign.registration}", font=font_normal, fill="white")
+    draw.text((5, 60), "\uf017", font=awesome_font_small, fill="white")
+    if position.message_received is not None:
+        draw.text((10, 60), f"{position.message_received.strftime("%H:%M:%S")} ({position.num_message})", font=font_normal, fill="white")
     draw_small_compass(draw, 110, 40, position.bearing)
 
     if low_alt_prio_switch_state == GPIO.LOW:
