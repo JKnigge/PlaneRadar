@@ -30,6 +30,10 @@ LOW_ALT_PRIO_SWITCH_PIN = 24
 LED_YELLOW_PIN = 27
 LED_GREEN_PIN = 17
 
+#Dev values:
+DEV_SCREEN_SWITCH_STATE = True
+DEV_LOW_ALT_PRIO_SWITCH_STATE = False
+
 # Other Values
 R0 = 6371.0
 PREF_ALT_LIMIT_IN_FEET = 15000  #planes below this altitude will be preferred for the display.
@@ -390,12 +394,21 @@ def to_string_with_leading_zero(number: int) -> str:
 
 
 def read_switch_input(gpio_pin: int) -> bool:
-    try:
-        return GPIO.input(gpio_pin)
-    except Exception as e:
-        print(f"GPIO error: {e}")
-        traceback.print_exc()
-        switch_state = GPIO.LOW
+    if ENVIRONMENT == "development":
+        if gpio_pin == SCREEN_SWITCH_PIN:
+            return DEV_SCREEN_SWITCH_STATE
+        if gpio_pin == LOW_ALT_PRIO_SWITCH_PIN:
+            return DEV_LOW_ALT_PRIO_SWITCH_STATE
+        else:
+            print("Missing value for debug switch state. Using Low (False) state...")
+            return False
+    else:
+        try:
+            return GPIO.input(gpio_pin)
+        except Exception as e:
+            print(f"GPIO error: {e}")
+            traceback.print_exc()
+            switch_state = GPIO.LOW
 
 def turn_only_yellow_led_on():
     GPIO.output(LED_YELLOW_PIN, True)
