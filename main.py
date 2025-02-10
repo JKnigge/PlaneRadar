@@ -3,6 +3,7 @@ import csv
 import datetime
 import math
 import os
+import traceback
 from io import StringIO
 from pathlib import Path
 import socket
@@ -39,6 +40,7 @@ PREF_ALT_LIMIT_IN_FEET = 15000  #planes below this altitude will be preferred fo
 
 closest_aircraft = None
 last_screen_update = None
+low_alt_prio_switch_state = False
 
 load_dotenv()
 
@@ -261,9 +263,10 @@ def save_closest_aircraft(position_message: Positions):
 
 
 def is_plane_closer(position_message: Positions, saved_closest_aircraft: Positions or None) -> bool:
-    switch_state = GPIO.input(LOW_ALT_PRIO_SWITCH_PIN)
-    #print(f"Checking if plane is closer. Switch State is {switch_state}.")
-    if switch_state == GPIO.LOW:
+    global low_alt_prio_switch_state
+
+    #print(f"Checking if plane is closer. Switch State is {low_alt_prio_switch_state}.")
+    if low_alt_prio_switch_state == GPIO.LOW:
         return distance_adjusted_by_altitude_penalty(position_message) < distance_adjusted_by_altitude_penalty(
             saved_closest_aircraft)
     return position_message.distance < saved_closest_aircraft.distance
@@ -311,7 +314,7 @@ def display_closest_aircraft(keepon: bool):
 
 
 def write_on_screen(callsign: Callsigns, position: Positions, keepon: bool):
-    global device
+    global device, low_alt_prio_switch_state
 
     font_normal = make_font("DejaVuSansMono.ttf", 10)
     font_bold = make_font("DejaVuSansMono-Bold.ttf", 12)
@@ -328,8 +331,7 @@ def write_on_screen(callsign: Callsigns, position: Positions, keepon: bool):
     draw.text((5, 50), f"Reg: {callsign.registration}", font=font_normal, fill="white")
     draw_small_compass(draw, 110, 40, position.bearing)
 
-    switch_state = GPIO.input(LOW_ALT_PRIO_SWITCH_PIN)
-    if switch_state == GPIO.LOW:
+    if low_alt_prio_switch_state == GPIO.LOW:
         draw.text((105, 5), "\uf06e", font=awesome_font, fill="white")
 
     device.display(image)
@@ -387,6 +389,14 @@ def to_string_with_leading_zero(number: int) -> str:
     return output + str(number)
 
 
+def read_switch_input(gpio_pin: int) -> bool:
+    try:
+        return GPIO.input(gpio_pin)
+    except Exception as e:
+        print(f"GPIO error: {e}")
+        traceback.print_exc()
+        switch_state = GPIO.LOW
+
 def turn_only_yellow_led_on():
     GPIO.output(LED_YELLOW_PIN, True)
     GPIO.output(LED_GREEN_PIN, False)
@@ -403,6 +413,7 @@ def turn_off_all_led():
 
 
 def main(download_file: bool, screentime: int, keepon: bool):
+    global low_alt_prio_switch_state
     try:
         turn_only_yellow_led_on()
         aircraft_data = get_aircraft_data(download_file)
@@ -417,12 +428,13 @@ def main(download_file: bool, screentime: int, keepon: bool):
             with s.makefile() as f:
                 while True:
                     turn_only_green_led_on()
-                    switch_state = GPIO.input(SCREEN_SWITCH_PIN)
-                    #print(f"Screen update. Switch state is {switch_state}.")
-                    if switch_state != GPIO.HIGH:
+                    screen_switch_state = read_switch_input(SCREEN_SWITCH_PIN)
+                    #print(f"Screen update. Switch state is {screen_switch_state}.")
+                    if screen_switch_state != GPIO.HIGH:
                         clear_screen()
                     raw_message = f.readline()
                     if not raw_message:
+                        print("Missing message...")
                         break
                     message = SBSMessage(raw_message, aircraft_data)
                     if message.message_type == "MSG" and message.transmission_type == '1':
@@ -431,12 +443,17 @@ def main(download_file: bool, screentime: int, keepon: bool):
                     elif message.message_type == "MSG" and message.transmission_type == '3':
                         turn_only_yellow_led_on()
                         print(raw_message)
+                        low_alt_prio_switch_state = read_switch_input(LOW_ALT_PRIO_SWITCH_PIN)
                         handle_transmission_type_3(message)
-                        if switch_state == GPIO.HIGH:
+                        if screen_switch_state == GPIO.HIGH:
                             show_on_screen(screentime, keepon)
 
     except KeyboardInterrupt:
-        pass
+        print("User interrupted execution.")
+        raise  # Re-raises the exception so the program terminates properly
+    except Exception as e:
+        print(f"Error: {e}")
+        traceback.print_exc()
     finally:
         clear_screen()
         turn_off_all_led()
