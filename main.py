@@ -322,11 +322,11 @@ def display_closest_aircraft(keepon: bool):
 def write_on_screen(callsign: Callsigns, position: Positions, keepon: bool):
     global device, low_alt_prio_switch_state
 
-    font_normal = make_font("DejaVuSansMono.ttf", 9)
+    font_normal = make_font("DejaVuSansMono.ttf", 10)
     font_bold = make_font("DejaVuSansMono-Bold.ttf", 12)
     font_normal_small = make_font("DejaVuSansMono.ttf", 9)
     awesome_font = make_font("fontawesome-webfont.ttf", 12)
-    awesome_font_small = make_font("fontawesome-webfont.ttf", 10)
+    awesome_font_small = make_font("fontawesome-webfont.ttf", 9)
 
     image = Image.new('1', (device.width, device.height))
     draw = ImageDraw.Draw(image)
@@ -334,13 +334,13 @@ def write_on_screen(callsign: Callsigns, position: Positions, keepon: bool):
     draw.text((5, 1), "\uf072", font=awesome_font, fill="white")
     draw.text((20, 1), callsign.callsign, font=font_bold, fill="white")
     draw.text((5, 15), f"Alt: {position.altitude} ft", font=font_normal, fill="white")
-    draw.text((5, 24), f"Dist: {position.distance} km", font=font_normal, fill="white")
-    draw.text((5, 33), f"Type: {callsign.typecode}", font=font_normal, fill="white")
-    draw.text((5, 42), f"Reg: {callsign.registration}", font=font_normal, fill="white")
-    draw.text((5, 51), "\uf017", font=awesome_font_small, fill="white")
+    draw.text((5, 25), f"Dist: {position.distance} km", font=font_normal, fill="white")
+    draw.text((5, 35), f"Type: {callsign.typecode}", font=font_normal, fill="white")
+    draw.text((5, 45), f"Reg: {callsign.registration}", font=font_normal, fill="white")
+    draw.text((5, 54), "\uf017", font=awesome_font_small, fill="white")
     if position.message_received is not None:
-        message_timestamp = position.message_received.strftime("%H:%M:%S")
-        draw.text((15, 51), f"{message_timestamp} ({position.num_message})", font=font_normal_small, fill="white")
+        message_timestamp = callsign.last_message_received.strftime("%H:%M:%S")
+        draw.text((15, 54), f"{message_timestamp} ({callsign.num_messages})", font=font_normal_small, fill="white")
     draw_small_compass(draw, 110, 40, position.bearing)
 
     if low_alt_prio_switch_state == GPIO.LOW:
