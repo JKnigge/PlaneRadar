@@ -338,7 +338,8 @@ def write_on_screen(callsign: Callsigns, position: Positions, keepon: bool):
     draw.text((5, 50), f"Reg: {callsign.registration}", font=font_normal, fill="white")
     draw.text((5, 60), "\uf017", font=awesome_font_small, fill="white")
     if position.message_received is not None:
-        draw.text((10, 60), f"{position.message_received.strftime("%H:%M:%S")} ({position.num_message})", font=font_normal, fill="white")
+        message_timestamp = position.message_received.strftime("%H:%M:%S")
+        draw.text((10, 60), f"{message_timestamp} ({position.num_message})", font=font_normal, fill="white")
     draw_small_compass(draw, 110, 40, position.bearing)
 
     if low_alt_prio_switch_state == GPIO.LOW:
