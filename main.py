@@ -3,6 +3,7 @@ import csv
 import datetime
 import math
 import os
+import time
 import traceback
 from io import StringIO
 from pathlib import Path
@@ -37,6 +38,7 @@ DEV_LOW_ALT_PRIO_SWITCH_STATE = False
 # Other Values
 R0 = 6371.0
 PREF_ALT_LIMIT_IN_FEET = 15000  #planes below this altitude will be preferred for the display.
+MAX_MESSAGE_READ_RETRIES = 5
 
 ###############################################################################################
 # Program Code
@@ -436,30 +438,45 @@ def main(download_file: bool, screentime: int, keepon: bool):
         HOST = os.getenv("1090_HOST")
         PORT = int(os.getenv("1090_PORT"))
 
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect((HOST, PORT))
-            with s.makefile() as f:
-                while True:
-                    turn_only_green_led_on()
-                    screen_switch_state = read_switch_input(SCREEN_SWITCH_PIN)
-                    #print(f"Screen update. Switch state is {screen_switch_state}.")
-                    if screen_switch_state != GPIO.HIGH:
-                        clear_screen()
-                    raw_message = f.readline()
-                    if not raw_message:
-                        print("Missing message...")
-                        break
-                    message = SBSMessage(raw_message, aircraft_data)
-                    if message.message_type == "MSG" and message.transmission_type == '1':
-                        print(raw_message)
-                        handle_transmission_type_1(message)
-                    elif message.message_type == "MSG" and message.transmission_type == '3':
-                        turn_only_yellow_led_on()
-                        print(raw_message)
-                        low_alt_prio_switch_state = read_switch_input(LOW_ALT_PRIO_SWITCH_PIN)
-                        handle_transmission_type_3(message)
-                        if screen_switch_state == GPIO.HIGH:
-                            show_on_screen(screentime, keepon)
+        while True:  # Restart loop if connection is lost
+            missing_messages = 0
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.connect((HOST, PORT))
+                    with s.makefile() as f:
+                        while True:
+                            turn_only_green_led_on()
+                            screen_switch_state = read_switch_input(SCREEN_SWITCH_PIN)
+                            if screen_switch_state != GPIO.HIGH:
+                                clear_screen()
+
+                            raw_message = f.readline()
+                            if not raw_message:
+                                missing_messages += 1
+                                if missing_messages >= MAX_MESSAGE_READ_RETRIES:
+                                    print("Connection lost. Restarting connection...")
+                                    break
+                                print(
+                                    f"Warning: No data received. Retrying (attempt {missing_messages}/{MAX_MESSAGE_READ_RETRIES})...")
+                                time.sleep(1)
+                                continue
+
+                            missing_messages = 0  # Reset on successful read
+                            message = SBSMessage(raw_message, aircraft_data)
+                            if message.message_type == "MSG" and message.transmission_type == '1':
+                                print(raw_message)
+                                handle_transmission_type_1(message)
+                            elif message.message_type == "MSG" and message.transmission_type == '3':
+                                turn_only_yellow_led_on()
+                                print(raw_message)
+                                low_alt_prio_switch_state = read_switch_input(LOW_ALT_PRIO_SWITCH_PIN)
+                                handle_transmission_type_3(message)
+                                if screen_switch_state == GPIO.HIGH:
+                                    show_on_screen(screentime, keepon)
+
+            except (socket.error, ConnectionError) as conn_error:
+                print(f"Socket error: {conn_error}. Retrying in 2 seconds...")
+                time.sleep(2)
 
     except KeyboardInterrupt:
         print("User interrupted execution.")
