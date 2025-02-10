@@ -262,7 +262,7 @@ def save_closest_aircraft(position_message: Positions):
 
 def is_plane_closer(position_message: Positions, saved_closest_aircraft: Positions or None) -> bool:
     switch_state = GPIO.input(LOW_ALT_PRIO_SWITCH_PIN)
-    print(f"Checking if plane is closer. Switch State is {switch_state}.")
+    #print(f"Checking if plane is closer. Switch State is {switch_state}.")
     if switch_state == GPIO.LOW:
         return distance_adjusted_by_altitude_penalty(position_message) < distance_adjusted_by_altitude_penalty(
             saved_closest_aircraft)
@@ -418,7 +418,7 @@ def main(download_file: bool, screentime: int, keepon: bool):
                 while True:
                     turn_only_green_led_on()
                     switch_state = GPIO.input(SCREEN_SWITCH_PIN)
-                    print(f"Screen update. Switch state is {switch_state}.")
+                    #print(f"Screen update. Switch state is {switch_state}.")
                     if switch_state != GPIO.HIGH:
                         clear_screen()
                     raw_message = f.readline()
@@ -438,6 +438,7 @@ def main(download_file: bool, screentime: int, keepon: bool):
     except KeyboardInterrupt:
         pass
     finally:
+        clear_screen()
         turn_off_all_led()
         GPIO.cleanup()
 
