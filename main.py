@@ -263,7 +263,7 @@ def save_closest_aircraft(position_message: Positions):
 def is_plane_closer(position_message: Positions, saved_closest_aircraft: Positions or None) -> bool:
     switch_state = GPIO.input(LOW_ALT_PRIO_SWITCH_PIN)
     print(f"Checking if plane is closer. Switch State is {switch_state}.")
-    if switch_state == GPIO.HIGH:
+    if switch_state == GPIO.LOW:
         return distance_adjusted_by_altitude_penalty(position_message) < distance_adjusted_by_altitude_penalty(
             saved_closest_aircraft)
     return position_message.distance < saved_closest_aircraft.distance
@@ -329,7 +329,7 @@ def write_on_screen(callsign: Callsigns, position: Positions, keepon: bool):
     draw_small_compass(draw, 110, 40, position.bearing)
 
     switch_state = GPIO.input(LOW_ALT_PRIO_SWITCH_PIN)
-    if switch_state == GPIO.HIGH:
+    if switch_state == GPIO.LOW:
         draw.text((105, 5), "\uf06e", font=awesome_font, fill="white")
 
     device.display(image)
@@ -397,8 +397,14 @@ def turn_only_green_led_on():
     GPIO.output(LED_GREEN_PIN, True)
 
 
+def turn_off_all_led():
+    GPIO.output(LED_YELLOW_PIN, False)
+    GPIO.output(LED_GREEN_PIN, False)
+
+
 def main(download_file: bool, screentime: int, keepon: bool):
     try:
+        turn_only_yellow_led_on()
         aircraft_data = get_aircraft_data(download_file)
 
         print("Aircraft data loaded.")
@@ -432,6 +438,7 @@ def main(download_file: bool, screentime: int, keepon: bool):
     except KeyboardInterrupt:
         pass
     finally:
+        turn_off_all_led()
         GPIO.cleanup()
 
 
