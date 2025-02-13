@@ -342,7 +342,7 @@ def write_on_screen(callsign: Callsigns, position: Positions, keepon: bool):
     draw_small_compass(draw, 110, 40, position.bearing)
 
     if low_alt_prio_switch_state == GPIO.LOW:
-        draw.text((105, 5), "\uf06e", font=awesome_font, fill="white")
+        draw.text((105, 50), "\uf06e", font=awesome_font, fill="white")
 
     device.display(image)
 
