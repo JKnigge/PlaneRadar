@@ -440,7 +440,7 @@ def turn_off_all_led():
 
 
 def broadcast_closest_plane():
-    global closest_aircraft
+    global closest_aircraft, low_alt_prio_switch_state
     if closest_aircraft is None:
         return
     callsign = get_last_callsign_during_last_hour_for(closest_aircraft.hex_ident)
@@ -449,6 +449,10 @@ def broadcast_closest_plane():
     position: Positions = closest_aircraft
     bearing_deg = round(math.degrees(position.bearing) % 360, 2)
     bearing_text = to_string_with_leading_zero(int(bearing_deg))
+    if low_alt_prio_switch_state:
+        mode = "ALT PNY on"
+    else:
+        mode = "ALT PNY off"
     data = {
         "callsign": callsign.callsign,
         "registration": callsign.registration if callsign.registration else "-",
@@ -457,7 +461,8 @@ def broadcast_closest_plane():
         "type": callsign.typecode if callsign.typecode else "-",
         "bearing": bearing_text,
         "timestamp": position.message_received.strftime("%H:%M:%S") if position.message_received else "-",
-        "message_num": position.num_message
+        "message_num": position.num_message,
+        "mode": mode
     }
     send_data_to_server(data)
 

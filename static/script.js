@@ -10,4 +10,5 @@ ws.onmessage = function(event) {
     document.getElementById("timestamp").innerText = data.timestamp;
     document.getElementById("message").innerText = data.message_num;
     document.getElementById("registration").innerText = data.registration;
+    document.getElementById("mode").innerText = data.mode;
 };
