@@ -1,6 +1,6 @@
 [Unit]
 Description=Python script to read ADS-B messages
-After=dump1090.service
+After=dump1090.service planeserver.service
 
 [Service]
 WorkingDirectory=/home/pi/PlaneRadar/
