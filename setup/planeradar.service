@@ -4,7 +4,7 @@ After=dump1090.service
 
 [Service]
 WorkingDirectory=/home/pi/PlaneRadar/
-ExecStart=/bin/bash -c "source /home/pi/PlaneRadar/venv/bin/activate && python /home/pi/PlaneRadar/main.py -s 4"
+ExecStart=/bin/bash -c "source /home/pi/PlaneRadar/venv/bin/activate && python /home/pi/PlaneRadar/planedata_processor.py -s 4 -b"
 Restart=always
 User=pi
 

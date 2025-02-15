@@ -1,9 +1,9 @@
 import argparse
+import asyncio
 import csv
 import datetime
 import math
 import os
-import time
 import traceback
 from io import StringIO
 from pathlib import Path
@@ -39,6 +39,7 @@ DEV_LOW_ALT_PRIO_SWITCH_STATE = False
 R0 = 6371.0
 PREF_ALT_LIMIT_IN_FEET = 15000  #planes below this altitude will be preferred for the display.
 MAX_MESSAGE_READ_RETRIES = 5
+SERVER_URL = "http://127.0.0.1:8000/update"
 
 ###############################################################################################
 # Program Code
@@ -331,7 +332,7 @@ def write_on_screen(callsign: Callsigns, position: Positions, keepon: bool):
     draw = ImageDraw.Draw(image)
 
     draw.text((5, 1), "\uf072", font=awesome_font, fill="white")
-    draw.text((20, 1),  create_header(callsign), font=font_bold, fill="white")
+    draw.text((20, 1), create_header(callsign), font=font_bold, fill="white")
     draw.text((5, 15), f"Alt: {position.altitude} ft", font=font_normal, fill="white")
     draw.text((5, 25), f"Dist: {position.distance} km", font=font_normal, fill="white")
     draw.text((5, 35), f"Type: {callsign.typecode}", font=font_normal, fill="white")
@@ -422,6 +423,7 @@ def read_switch_input(gpio_pin: int) -> bool:
             traceback.print_exc()
             switch_state = GPIO.LOW
 
+
 def turn_only_yellow_led_on():
     GPIO.output(LED_YELLOW_PIN, True)
     GPIO.output(LED_GREEN_PIN, False)
@@ -437,7 +439,41 @@ def turn_off_all_led():
     GPIO.output(LED_GREEN_PIN, False)
 
 
-def main(download_file: bool, screentime: int, keepon: bool):
+def broadcast_closest_plane():
+    global closest_aircraft
+    if closest_aircraft is None:
+        return
+    callsign = get_last_callsign_during_last_hour_for(closest_aircraft.hex_ident)
+    if callsign is None:
+        return
+    position: Positions = closest_aircraft
+    bearing_deg = round(math.degrees(position.bearing) % 360, 2)
+    bearing_text = to_string_with_leading_zero(int(bearing_deg))
+    data = {
+        "callsign": callsign.callsign,
+        "registration": callsign.registration if callsign.registration else "-",
+        "altitude": position.altitude if position.altitude else "-",
+        "distance": position.distance if position.distance else "-",
+        "type": callsign.typecode if callsign.typecode else "-",
+        "bearing": bearing_text,
+        "timestamp": position.message_received.strftime("%H:%M:%S") if position.message_received else "-",
+        "message_num": position.num_message
+    }
+    send_data_to_server(data)
+
+
+def send_data_to_server(data):
+    try:
+        response = requests.post(SERVER_URL, json=data)
+        if not response.status_code == 200:
+            print(f"Failed to send data: {response.status_code}")
+        #else:
+            # print("Data successfully sent.")
+    except requests.exceptions.RequestException as e:
+        print(f"Error sending data: {e}")
+
+
+def process_planedata(download_file: bool, screentime: int, keepon: bool, broadcast: bool):
     global low_alt_prio_switch_state
     try:
         turn_only_yellow_led_on()
@@ -468,7 +504,7 @@ def main(download_file: bool, screentime: int, keepon: bool):
                                     break
                                 print(
                                     f"Warning: No data received. Retrying (attempt {missing_messages}/{MAX_MESSAGE_READ_RETRIES})...")
-                                time.sleep(1)
+                                asyncio.sleep(1)
                                 continue
 
                             missing_messages = 0  # Reset on successful read
@@ -481,12 +517,14 @@ def main(download_file: bool, screentime: int, keepon: bool):
                                 print(raw_message)
                                 low_alt_prio_switch_state = read_switch_input(LOW_ALT_PRIO_SWITCH_PIN)
                                 handle_transmission_type_3(message)
+                                if broadcast:
+                                    broadcast_closest_plane()
                                 if screen_switch_state == GPIO.HIGH:
                                     show_on_screen(screentime, keepon)
 
             except (socket.error, ConnectionError) as conn_error:
                 print(f"Socket error: {conn_error}. Retrying in 2 seconds...")
-                time.sleep(2)
+                asyncio.sleep(2)
 
     except KeyboardInterrupt:
         print("User interrupted execution.")
@@ -515,6 +553,11 @@ if __name__ == "__main__":
         help="Set to keep the screen on."
     )
     parser.add_argument(
+        "-b", "--broadcast",
+        action="store_true",
+        help="Publish data to server via rest."
+    )
+    parser.add_argument(
         "-s", "--screentime",
         type=int,
         default=2,
@@ -522,5 +565,4 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-
-    main(args.download, args.screentime, args.keepon)
+    process_planedata(args.download, args.screentime, args.keepon, args.broadcast)
