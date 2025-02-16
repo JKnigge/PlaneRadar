@@ -151,7 +151,7 @@ def handle_transmission_type_1(message: SBSMessage):
     callsign.operator = message.operator
 
 
-def get_callsign_from_list(message):
+def get_callsign_from_list(message) -> Callsigns | None:
     global callsigns
     callsigns_matching_message = [c for c in callsigns if c.hex_ident == message.hex_ident]
     callsign = callsigns_matching_message[-1] if callsigns_matching_message else None
@@ -228,7 +228,7 @@ def create_or_update_position(bearing: float, callsign: Callsigns, distance: flo
     return position
 
 
-def get_callsign(closest_callsign, closest_low_alt_callsign, message):
+def get_callsign(closest_callsign, closest_low_alt_callsign, message) -> Callsigns | None:
     if closest_callsign is not None and closest_callsign.hex_ident == message.hex_ident:
         callsign = closest_callsign
     elif closest_low_alt_callsign is not None and closest_low_alt_callsign == message.hex_ident:
@@ -335,7 +335,7 @@ def is_plane_closer_low_alt(hex_ident: str, distance: float, altitude: int) -> b
     if closest_aircraft_low_alt is None or closest_aircraft_low_alt.hex_ident == hex_ident:
         return True
     if distance_adjusted_by_altitude_penalty(distance, altitude) < distance_adjusted_by_altitude_penalty(
-            closest_aircraft_low_alt.distance, closest_aircraft_low_alt.altitude):
+            closest_aircraft_low_alt.distance, int(closest_aircraft_low_alt.altitude)):
         return True
     return False
 
@@ -543,13 +543,15 @@ def create_post_request(data):
     requests.post(SERVER_URL, json=data)
 
 
-def clear_screen_if_status_changed(screen_switch_state: bool):
+def update_screen_if_status_changed(screen_switch_state: bool, screentime_in_seconds: int, keepon: bool):
     global was_screen_on
     if was_screen_on and screen_switch_state != GPIO.HIGH:
         clear_screen()
         was_screen_on = False
-    else:
+    elif not was_screen_on:
         was_screen_on = True
+        low_alt_prio_switch_state = read_switch_input(LOW_ALT_PRIO_SWITCH_PIN)
+        show_on_screen(screentime_in_seconds, keepon, low_alt_prio_switch_state)
 
 
 def process_planedata(download_file: bool, screentime: int, keepon: bool, broadcast: bool):
@@ -572,7 +574,7 @@ def process_planedata(download_file: bool, screentime: int, keepon: bool, broadc
                         while True:
                             turn_only_green_led_on()
                             screen_switch_state = read_switch_input(SCREEN_SWITCH_PIN)
-                            clear_screen_if_status_changed(screen_switch_state)
+                            update_screen_if_status_changed(screen_switch_state, screentime, keepon)
                             raw_message = f.readline()
                             if not raw_message:
                                 missing_messages += 1
