@@ -49,6 +49,7 @@ SERVER_URL = "http://127.0.0.1:8000/update"
 closest_aircraft = None
 last_screen_update = None
 low_alt_prio_switch_state = False
+was_screen_on = False
 
 load_dotenv()
 
@@ -480,6 +481,14 @@ def create_post_request(data):
     requests.post(SERVER_URL, json=data)
 
 
+def clear_screen_if_status_changed(screen_switch_state: bool):
+    global was_screen_on
+    if was_screen_on and screen_switch_state != GPIO.HIGH:
+        clear_screen()
+        was_screen_on = False
+    else:
+        was_screen_on = True
+
 def process_planedata(download_file: bool, screentime: int, keepon: bool, broadcast: bool):
     global low_alt_prio_switch_state
     try:
@@ -500,9 +509,7 @@ def process_planedata(download_file: bool, screentime: int, keepon: bool, broadc
                         while True:
                             turn_only_green_led_on()
                             screen_switch_state = read_switch_input(SCREEN_SWITCH_PIN)
-                            if screen_switch_state != GPIO.HIGH:
-                                clear_screen()
-
+                            clear_screen_if_status_changed(screen_switch_state)
                             raw_message = f.readline()
                             if not raw_message:
                                 missing_messages += 1
