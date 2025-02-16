@@ -1,10 +1,10 @@
 import argparse
-import asyncio
 import concurrent.futures
 import csv
 import datetime
 import math
 import os
+import time
 import traceback
 from io import StringIO
 from pathlib import Path
@@ -511,7 +511,6 @@ def process_planedata(download_file: bool, screentime: int, keepon: bool, broadc
                                     break
                                 print(
                                     f"Warning: No data received. Retrying (attempt {missing_messages}/{MAX_MESSAGE_READ_RETRIES})...")
-                                asyncio.sleep(1)
                                 continue
 
                             missing_messages = 0  # Reset on successful read
@@ -531,7 +530,7 @@ def process_planedata(download_file: bool, screentime: int, keepon: bool, broadc
 
             except (socket.error, ConnectionError) as conn_error:
                 print(f"Socket error: {conn_error}. Retrying in 2 seconds...")
-                asyncio.sleep(2)
+                time.sleep(1)
 
     except KeyboardInterrupt:
         print("User interrupted execution.")
