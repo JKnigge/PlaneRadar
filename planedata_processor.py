@@ -140,10 +140,12 @@ def handle_transmission_type_1(message: SBSMessage):
     if callsign is None:
         callsign = create_callsign_entry(message)
         callsign.save()
+        print(f"Callsign added (id: {callsign.id}, hex_ident: {callsign.hex_ident}, callsign: {callsign.callsign}).")
         add_callsign_to_list(callsign)
     callsign.last_message_generated = message.get_generated_datetime()
     callsign.last_message_received = datetime.datetime.now()
     callsign.num_messages = callsign.num_messages + 1
+    callsign.registration = message.registration
     callsign.registration = message.registration
     callsign.typecode = message.typecode
     callsign.operator = message.operator
@@ -196,6 +198,7 @@ def handle_transmission_type_3(message: SBSMessage) -> bool:
                 return False
             bearing = calculate_bearing(plane_position_in_radians, observer_position)
             position = create_or_update_position(bearing, callsign, distance, message)
+            print(f"Position added or updated (id: {position.id}, hex_ident: {position.hex_ident}, callsign_id: {position.callsign_id}).")
             if is_closest:
                 closest_aircraft = position
                 closest_aircraft_callsign = callsign
@@ -585,11 +588,9 @@ def process_planedata(download_file: bool, screentime: int, keepon: bool, broadc
                             message = SBSMessage(raw_message, aircraft_data)
                             if message.message_type == "MSG" and message.transmission_type == '1':
                                 turn_only_yellow_led_on()
-                                print(raw_message)
                                 handle_transmission_type_1(message)
                             elif message.message_type == "MSG" and message.transmission_type == '3':
                                 turn_only_yellow_led_on()
-                                print(raw_message)
                                 changed = handle_transmission_type_3(message)
                                 low_alt_prio_switch_state = read_switch_input(LOW_ALT_PRIO_SWITCH_PIN)
                                 if last_low_alt_prio_switch_state != low_alt_prio_switch_state:
