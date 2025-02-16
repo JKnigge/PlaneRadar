@@ -32,13 +32,13 @@ LOW_ALT_PRIO_SWITCH_PIN = 24
 LED_YELLOW_PIN = 27
 LED_GREEN_PIN = 17
 
-#Dev values:
+# Dev values:
 DEV_SCREEN_SWITCH_STATE = True
 DEV_LOW_ALT_PRIO_SWITCH_STATE = False
 
 # Other Values
 R0 = 6371.0
-PREF_ALT_LIMIT_IN_FEET = 15000  #planes below this altitude will be preferred for the display.
+PREF_ALT_LIMIT_IN_FEET = 15000  # planes below this altitude will be preferred for the display.
 MAX_MESSAGE_READ_RETRIES = 5
 SERVER_URL = "http://127.0.0.1:8000/update"
 
@@ -46,13 +46,13 @@ SERVER_URL = "http://127.0.0.1:8000/update"
 # Program Code
 ###############################################################################################
 
-closest_aircraft = None
-closest_aircraft_low_alt = None
-closest_aircraft_callsign = None
-closest_aircraft_low_alt_callsign = None
-last_screen_update = None
-was_screen_on = False
-last_low_alt_prio_switch_state = False
+closest_aircraft: Positions | None = None
+closest_aircraft_low_alt: Positions | None = None
+closest_aircraft_callsign: Callsigns | None = None
+closest_aircraft_low_alt_callsign: Callsigns | None = None
+last_screen_update: datetime.datetime | None = None
+was_screen_on: bool = False
+last_low_alt_prio_switch_state: bool = False
 
 load_dotenv()
 
@@ -173,16 +173,7 @@ def handle_transmission_type_3(message: SBSMessage) -> bool:
             if callsign is None:
                 return False
             bearing = calculate_bearing(plane_position_in_radians, observer_position)
-            position_0 = Positions.select().where(Positions.callsign_id == callsign.id).first()
-            if position_0 is None:
-                position = create_position_entry(callsign, message, distance, bearing, 0)
-            else:
-                position_i = Positions.select().where(
-                    (Positions.callsign_id == callsign.id) & (Positions.num_message > 0)).first()
-                if position_i is None:
-                    position = create_position_entry(callsign, message, distance, bearing, 1)
-                else:
-                    position = update_position_entry(position_i, message, distance, bearing)
+            position = create_or_update_position(bearing, callsign, distance, message)
             if is_closest:
                 closest_aircraft = position
                 closest_aircraft_callsign = callsign
@@ -198,11 +189,25 @@ def handle_transmission_type_3(message: SBSMessage) -> bool:
         pass
 
 
-def get_callsign(closest_aircraft_callsign, closest_aircraft_low_alt_callsign, message):
-    if closest_aircraft_callsign.hex_ident == message.hex_ident:
-        callsign = closest_aircraft_callsign
-    elif closest_aircraft_low_alt_callsign == message.hex_ident:
-        callsign = closest_aircraft_low_alt_callsign
+def create_or_update_position(bearing: float, callsign: Callsigns, distance: float, message: SBSMessage) -> Positions:
+    position_0 = Positions.select().where(Positions.callsign_id == callsign.id).first()
+    if position_0 is None:
+        position = create_position_entry(callsign, message, distance, bearing, 0)
+    else:
+        position_i = Positions.select().where(
+            (Positions.callsign_id == callsign.id) & (Positions.num_message > 0)).first()
+        if position_i is None:
+            position = create_position_entry(callsign, message, distance, bearing, 1)
+        else:
+            position = update_position_entry(position_i, message, distance, bearing)
+    return position
+
+
+def get_callsign(closest_callsign, closest_low_alt_callsign, message):
+    if closest_callsign.hex_ident == message.hex_ident:
+        callsign = closest_callsign
+    elif closest_low_alt_callsign == message.hex_ident:
+        callsign = closest_low_alt_callsign
     else:
         callsign = get_last_callsign_during_last_hour_for(message.hex_ident)
     return callsign
@@ -269,19 +274,19 @@ def get_last_callsign_during_last_hour_for(hex_ident: str) -> Callsigns:
             .first())
 
 
-def calculate_distance(plane_postion_in_radians: (float, float), observer_position: (float, float)) -> float:
-    F0 = cos(observer_position[0])  # local conversion for spherical coordinates
-    distance = round(R0 * sqrt((plane_postion_in_radians[0] - observer_position[0]) ** 2 + F0 ** 2 * (
-            plane_postion_in_radians[1] - observer_position[1]) ** 2), 2)
+def calculate_distance(plane_position_in_radians: (float, float), observer_position: (float, float)) -> float:
+    f0 = cos(observer_position[0])  # local conversion for spherical coordinates
+    distance = round(R0 * sqrt((plane_position_in_radians[0] - observer_position[0]) ** 2 + f0 ** 2 * (
+            plane_position_in_radians[1] - observer_position[1]) ** 2), 2)
     return distance
 
 
 def calculate_bearing(plane_position_in_radians: (float, float), observer_position: (float, float)) -> float:
     delta_lat = plane_position_in_radians[0] - observer_position[0]
     delta_lon = plane_position_in_radians[1] - observer_position[1]
-    F0 = math.cos(observer_position[0])
+    f0 = math.cos(observer_position[0])
 
-    bearing_rad = math.atan2(delta_lon * F0, delta_lat)
+    bearing_rad = math.atan2(delta_lon * f0, delta_lat)
     return bearing_rad
 
 
@@ -455,7 +460,7 @@ def read_switch_input(gpio_pin: int) -> bool:
         except Exception as e:
             print(f"GPIO error: {e}")
             traceback.print_exc()
-            switch_state = GPIO.LOW
+            return GPIO.LOW
 
 
 def turn_only_yellow_led_on():
@@ -530,14 +535,14 @@ def process_planedata(download_file: bool, screentime: int, keepon: bool, broadc
 
         print("Aircraft data loaded.")
 
-        HOST = os.getenv("1090_HOST")
-        PORT = int(os.getenv("1090_PORT"))
+        host = os.getenv("1090_HOST")
+        port = int(os.getenv("1090_PORT"))
 
         while True:  # Restart loop if connection is lost
             missing_messages = 0
             try:
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                    s.connect((HOST, PORT))
+                    s.connect((host, port))
                     with s.makefile() as f:
                         while True:
                             turn_only_green_led_on()
@@ -611,7 +616,8 @@ if __name__ == "__main__":
         "-s", "--screentime",
         type=int,
         default=2,
-        help="Set the wait time in seconds between screen refreshs. Can also be set to 0 for immediate refresh (default: 2)."
+        help="Set the wait time in seconds between screen refreshs. Can also be set to 0 for immediate refresh ("
+             "default: 2)."
     )
 
     args = parser.parse_args()
