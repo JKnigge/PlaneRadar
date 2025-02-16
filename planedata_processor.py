@@ -47,9 +47,12 @@ SERVER_URL = "http://127.0.0.1:8000/update"
 ###############################################################################################
 
 closest_aircraft = None
+closest_aircraft_low_alt = None
+closest_aircraft_callsign = None
+closest_aircraft_low_alt_callsign = None
 last_screen_update = None
-low_alt_prio_switch_state = False
 was_screen_on = False
+last_low_alt_prio_switch_state = False
 
 load_dotenv()
 
@@ -156,30 +159,53 @@ def create_callsign_entry(message: SBSMessage) -> Callsigns:
     return callsign
 
 
-def handle_transmission_type_3(message: SBSMessage):
-    callsign = get_last_callsign_during_last_hour_for(message.hex_ident)
-    if callsign is None:
-        return
+def handle_transmission_type_3(message: SBSMessage) -> bool:
+    global closest_aircraft, closest_aircraft_low_alt, closest_aircraft_callsign, closest_aircraft_low_alt_callsign
     try:
-        plane_postion_in_radians = (radians(float(message.latitude)), radians(float(message.longitude)))
+        plane_position_in_radians = (radians(float(message.latitude)), radians(float(message.longitude)))
         observer_position = get_observer_location_in_degrees()
-        distance = calculate_distance(plane_postion_in_radians, observer_position)
-        bearing = calculate_bearing(plane_postion_in_radians, observer_position)
-        position_0 = Positions.select().where(Positions.callsign_id == callsign.id).first()
-        if position_0 is None:
-            create_position_entry(callsign, message, distance, bearing, 0)
-        else:
-            position_i = Positions.select().where(
-                (Positions.callsign_id == callsign.id) & (Positions.num_message > 0)).first()
-            if position_i is None:
-                create_position_entry(callsign, message, distance, bearing, 1)
+        distance = calculate_distance(plane_position_in_radians, observer_position)
+        altitude = int(message.altitude)
+        is_closest = is_plane_closer(message.hex_ident, distance)
+        is_closest_low_alt = is_plane_closer_low_alt(message.hex_ident, distance, altitude)
+        if is_closest or is_closest_low_alt:
+            callsign = get_callsign(closest_aircraft_callsign, closest_aircraft_low_alt_callsign, message)
+            if callsign is None:
+                return False
+            bearing = calculate_bearing(plane_position_in_radians, observer_position)
+            position_0 = Positions.select().where(Positions.callsign_id == callsign.id).first()
+            if position_0 is None:
+                position = create_position_entry(callsign, message, distance, bearing, 0)
             else:
-                update_position_entry(position_i, message, distance, bearing)
-        save_closest_distance(callsign, distance)
-        save_lowest_altitude(callsign, int(message.altitude))
+                position_i = Positions.select().where(
+                    (Positions.callsign_id == callsign.id) & (Positions.num_message > 0)).first()
+                if position_i is None:
+                    position = create_position_entry(callsign, message, distance, bearing, 1)
+                else:
+                    position = update_position_entry(position_i, message, distance, bearing)
+            if is_closest:
+                closest_aircraft = position
+                closest_aircraft_callsign = callsign
+            if is_closest_low_alt:
+                closest_aircraft_low_alt = position
+                closest_aircraft_low_alt_callsign = callsign
+            save_closest_distance(callsign, distance)
+            save_lowest_altitude(callsign, int(message.altitude))
+            return True
+        return False
 
     except ValueError:
         pass
+
+
+def get_callsign(closest_aircraft_callsign, closest_aircraft_low_alt_callsign, message):
+    if closest_aircraft_callsign.hex_ident == message.hex_ident:
+        callsign = closest_aircraft_callsign
+    elif closest_aircraft_low_alt_callsign == message.hex_ident:
+        callsign = closest_aircraft_low_alt_callsign
+    else:
+        callsign = get_last_callsign_during_last_hour_for(message.hex_ident)
+    return callsign
 
 
 def save_closest_distance(callsign: Callsigns, distance: float):
@@ -194,7 +220,7 @@ def save_lowest_altitude(callsign: Callsigns, height: int):
         callsign.save()
 
 
-def update_position_entry(position: Positions, message: SBSMessage, distance: float, bearing: float):
+def update_position_entry(position: Positions, message: SBSMessage, distance: float, bearing: float) -> Positions:
     try:
         position.hex_ident = message.hex_ident
         position.latitude = message.latitude
@@ -206,13 +232,15 @@ def update_position_entry(position: Positions, message: SBSMessage, distance: fl
         position.num_message = position.num_message + 1
 
         position.save()
-        save_closest_aircraft(position)
+
+        return position
 
     except ValueError:
         pass
 
 
-def create_position_entry(callsign: Callsigns, message: SBSMessage, distance: float, bearing: float, num: int):
+def create_position_entry(callsign: Callsigns, message: SBSMessage, distance: float, bearing: float,
+                          num: int) -> Positions:
     try:
         position = Positions(
             hex_ident=message.hex_ident,
@@ -226,7 +254,7 @@ def create_position_entry(callsign: Callsigns, message: SBSMessage, distance: fl
             num_message=num
         )
         position.save()
-        save_closest_aircraft(position)
+        return position
 
     except ValueError:
         pass
@@ -263,27 +291,27 @@ def get_observer_location_in_degrees() -> (float, float):
     return radians(latitude), radians(longitude)
 
 
-def save_closest_aircraft(position_message: Positions):
+def is_plane_closer(hex_ident: str, distance: float) -> bool:
     global closest_aircraft
-    if (closest_aircraft is None
-            or closest_aircraft.hex_ident == position_message.hex_ident
-            or is_plane_closer(position_message, closest_aircraft)):
-        closest_aircraft = position_message
+    if closest_aircraft is None or closest_aircraft.hex_ident == hex_ident:
+        return True
+    if distance < closest_aircraft.distance:
+        return True
+    return False
 
 
-def is_plane_closer(position_message: Positions, saved_closest_aircraft: Positions or None) -> bool:
-    global low_alt_prio_switch_state
+def is_plane_closer_low_alt(hex_ident: str, distance: float, altitude: int) -> bool:
+    global closest_aircraft_low_alt
+    if closest_aircraft_low_alt is None or closest_aircraft_low_alt.hex_ident == hex_ident:
+        return True
+    if distance_adjusted_by_altitude_penalty(distance, altitude) < distance_adjusted_by_altitude_penalty(
+            closest_aircraft_low_alt.distance, closest_aircraft_low_alt.altitude):
+        return True
+    return False
 
-    #print(f"Checking if plane is closer. Switch State is {low_alt_prio_switch_state}.")
-    if low_alt_prio_switch_state == GPIO.LOW:
-        return distance_adjusted_by_altitude_penalty(position_message) < distance_adjusted_by_altitude_penalty(
-            saved_closest_aircraft)
-    return position_message.distance < saved_closest_aircraft.distance
 
-
-def distance_adjusted_by_altitude_penalty(position_message: Positions) -> bool:
-    return position_message.distance if int(
-        position_message.altitude) < PREF_ALT_LIMIT_IN_FEET else position_message.distance + 20
+def distance_adjusted_by_altitude_penalty(distance: float, altitude: int) -> float:
+    return distance if altitude < PREF_ALT_LIMIT_IN_FEET else distance + 20
 
 
 def clear_screen():
@@ -292,16 +320,16 @@ def clear_screen():
     device.show()
 
 
-def show_on_screen(screentime_in_seconds: int, keepon: bool):
+def show_on_screen(screentime_in_seconds: int, keepon: bool, low_alt_prio_switch_state: bool):
     global last_screen_update
 
     if screentime_in_seconds < 1:
-        display_closest_aircraft(keepon)
+        display_closest_aircraft(keepon, low_alt_prio_switch_state)
         return
 
     if last_screen_update is None:
         last_screen_update = datetime.datetime.now()
-        display_closest_aircraft(keepon)
+        display_closest_aircraft(keepon, low_alt_prio_switch_state)
         return
 
     time_now = datetime.datetime.now()
@@ -309,21 +337,25 @@ def show_on_screen(screentime_in_seconds: int, keepon: bool):
 
     if timediff > datetime.timedelta(seconds=screentime_in_seconds):
         last_screen_update = time_now
-        display_closest_aircraft(keepon)
+        display_closest_aircraft(keepon, low_alt_prio_switch_state)
 
 
-def display_closest_aircraft(keepon: bool):
-    global closest_aircraft
-    if closest_aircraft is None:
+def display_closest_aircraft(keepon: bool, low_alt_prio_switch_state: bool):
+    global closest_aircraft, closest_aircraft_low_alt, closest_aircraft_callsign, closest_aircraft_low_alt_callsign
+
+    if low_alt_prio_switch_state == GPIO.LOW:
+        closest = closest_aircraft_low_alt
+        callsign = closest_aircraft_low_alt_callsign
+    else:
+        closest = closest_aircraft
+        callsign = closest_aircraft_callsign
+    if closest is None or callsign is None:
         return
-    callsign = get_last_callsign_during_last_hour_for(closest_aircraft.hex_ident)
-    if callsign is None:
-        return
-    write_on_screen(callsign, closest_aircraft, keepon)
+    write_on_screen(callsign, closest, keepon, low_alt_prio_switch_state)
 
 
-def write_on_screen(callsign: Callsigns, position: Positions, keepon: bool):
-    global device, low_alt_prio_switch_state
+def write_on_screen(callsign: Callsigns, position: Positions, keepon: bool, low_alt_prio_switch_state):
+    global device
 
     font_normal = make_font("DejaVuSansMono.ttf", 10)
     font_bold = make_font("DejaVuSansMono-Bold.ttf", 12)
@@ -441,8 +473,8 @@ def turn_off_all_led():
     GPIO.output(LED_GREEN_PIN, False)
 
 
-def broadcast_closest_plane():
-    global closest_aircraft, low_alt_prio_switch_state
+def broadcast_closest_plane(low_alt_prio_switch_state: bool):
+    global closest_aircraft
     if closest_aircraft is None:
         return
     callsign = get_last_callsign_during_last_hour_for(closest_aircraft.hex_ident)
@@ -489,8 +521,9 @@ def clear_screen_if_status_changed(screen_switch_state: bool):
     else:
         was_screen_on = True
 
+
 def process_planedata(download_file: bool, screentime: int, keepon: bool, broadcast: bool):
-    global low_alt_prio_switch_state
+    global last_low_alt_prio_switch_state
     try:
         turn_only_yellow_led_on()
         aircraft_data = get_aircraft_data(download_file)
@@ -523,17 +556,21 @@ def process_planedata(download_file: bool, screentime: int, keepon: bool, broadc
                             missing_messages = 0  # Reset on successful read
                             message = SBSMessage(raw_message, aircraft_data)
                             if message.message_type == "MSG" and message.transmission_type == '1':
+                                turn_only_yellow_led_on()
                                 print(raw_message)
                                 handle_transmission_type_1(message)
                             elif message.message_type == "MSG" and message.transmission_type == '3':
                                 turn_only_yellow_led_on()
                                 print(raw_message)
+                                changed = handle_transmission_type_3(message)
                                 low_alt_prio_switch_state = read_switch_input(LOW_ALT_PRIO_SWITCH_PIN)
-                                handle_transmission_type_3(message)
-                                if broadcast:
-                                    broadcast_closest_plane()
-                                if screen_switch_state == GPIO.HIGH:
-                                    show_on_screen(screentime, keepon)
+                                if last_low_alt_prio_switch_state != low_alt_prio_switch_state:
+                                    last_low_alt_prio_switch_state = low_alt_prio_switch_state
+                                    changed = True
+                                if changed and broadcast:
+                                    broadcast_closest_plane(low_alt_prio_switch_state)
+                                if changed and screen_switch_state == GPIO.HIGH:
+                                    show_on_screen(screentime, keepon, low_alt_prio_switch_state)
 
             except (socket.error, ConnectionError) as conn_error:
                 print(f"Socket error: {conn_error}. Retrying in 2 seconds...")
