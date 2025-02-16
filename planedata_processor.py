@@ -6,6 +6,7 @@ import math
 import os
 import time
 import traceback
+from collections import deque
 from io import StringIO
 from pathlib import Path
 import socket
@@ -41,6 +42,7 @@ R0 = 6371.0
 PREF_ALT_LIMIT_IN_FEET = 15000  # planes below this altitude will be preferred for the display.
 MAX_MESSAGE_READ_RETRIES = 5
 SERVER_URL = "http://127.0.0.1:8000/update"
+CALLSIGNS_LIST_MAX_LEN = 30
 
 ###############################################################################################
 # Program Code
@@ -53,6 +55,7 @@ closest_aircraft_low_alt_callsign: Callsigns | None = None
 last_screen_update: datetime.datetime | None = None
 was_screen_on: bool = False
 last_low_alt_prio_switch_state: bool = False
+callsigns: deque[Callsigns] = deque()
 
 load_dotenv()
 
@@ -133,16 +136,35 @@ def download_aircraft_data():
 
 
 def handle_transmission_type_1(message: SBSMessage):
-    callsign = get_last_callsign_during_last_hour_for(message.hex_ident)
+    callsign = get_callsign_from_list(message)
     if callsign is None:
         callsign = create_callsign_entry(message)
+        callsign.save()
+        add_callsign_to_list(callsign)
     callsign.last_message_generated = message.get_generated_datetime()
     callsign.last_message_received = datetime.datetime.now()
     callsign.num_messages = callsign.num_messages + 1
     callsign.registration = message.registration
     callsign.typecode = message.typecode
     callsign.operator = message.operator
-    callsign.save()
+
+
+def get_callsign_from_list(message):
+    global callsigns
+    callsigns_matching_message = [c for c in callsigns if c.hex_ident == message.hex_ident]
+    callsign = callsigns_matching_message[-1] if callsigns_matching_message else None
+    one_hour_ago = datetime.datetime.now() - datetime.timedelta(hours=1)
+    if callsign is None or callsign.last_message_generated < one_hour_ago:
+        return None
+    return callsign
+
+
+def add_callsign_to_list(callsign: Callsigns):
+    global callsigns
+    if len(callsigns) >= CALLSIGNS_LIST_MAX_LEN:
+        removed_callsign = callsigns.popleft()
+        removed_callsign.save()
+    callsigns.append(callsign)
 
 
 def create_callsign_entry(message: SBSMessage) -> Callsigns:
@@ -204,12 +226,12 @@ def create_or_update_position(bearing: float, callsign: Callsigns, distance: flo
 
 
 def get_callsign(closest_callsign, closest_low_alt_callsign, message):
-    if closest_callsign.hex_ident == message.hex_ident:
+    if closest_callsign is not None and closest_callsign.hex_ident == message.hex_ident:
         callsign = closest_callsign
-    elif closest_low_alt_callsign == message.hex_ident:
+    elif closest_low_alt_callsign is not None and closest_low_alt_callsign == message.hex_ident:
         callsign = closest_low_alt_callsign
     else:
-        callsign = get_last_callsign_during_last_hour_for(message.hex_ident)
+        callsign = get_callsign_from_list(message)
     return callsign
 
 
@@ -555,7 +577,8 @@ def process_planedata(download_file: bool, screentime: int, keepon: bool, broadc
                                     print("Connection lost. Restarting connection...")
                                     break
                                 print(
-                                    f"Warning: No data received. Retrying (attempt {missing_messages}/{MAX_MESSAGE_READ_RETRIES})...")
+                                    f"Warning: No data received. Retrying (attempt {missing_messages}"
+                                    f"/{MAX_MESSAGE_READ_RETRIES})...")
                                 continue
 
                             missing_messages = 0  # Reset on successful read
