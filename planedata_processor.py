@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import concurrent.futures
 import csv
 import datetime
 import math
@@ -469,13 +470,14 @@ def broadcast_closest_plane():
 
 def send_data_to_server(data):
     try:
-        response = requests.post(SERVER_URL, json=data)
-        if not response.status_code == 200:
-            print(f"Failed to send data: {response.status_code}")
-        #else:
-            # print("Data successfully sent.")
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            executor.submit(create_post_request, data)
     except requests.exceptions.RequestException as e:
         print(f"Error sending data: {e}")
+
+
+def create_post_request(data):
+    requests.post(SERVER_URL, json=data)
 
 
 def process_planedata(download_file: bool, screentime: int, keepon: bool, broadcast: bool):
