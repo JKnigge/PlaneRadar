@@ -450,9 +450,9 @@ def broadcast_closest_plane():
     bearing_deg = round(math.degrees(position.bearing) % 360, 2)
     bearing_text = to_string_with_leading_zero(int(bearing_deg))
     if low_alt_prio_switch_state:
-        mode = "ALT PNY on"
-    else:
         mode = "ALT PNY off"
+    else:
+        mode = "ALT PNY on"
     data = {
         "callsign": callsign.callsign,
         "registration": callsign.registration if callsign.registration else "-",
