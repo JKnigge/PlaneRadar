@@ -327,7 +327,7 @@ def is_plane_closer(hex_ident: str, distance: float) -> bool:
     global closest_aircraft
     if closest_aircraft is None or closest_aircraft.hex_ident == hex_ident:
         return True
-    if distance < closest_aircraft.distance:
+    if distance < closest_aircraft.distance or is_last_message_too_old(closest_aircraft):
         return True
     return False
 
@@ -336,11 +336,15 @@ def is_plane_closer_low_alt(hex_ident: str, distance: float, altitude: int) -> b
     global closest_aircraft_low_alt
     if closest_aircraft_low_alt is None or closest_aircraft_low_alt.hex_ident == hex_ident:
         return True
-    if distance_adjusted_by_altitude_penalty(distance, altitude) < distance_adjusted_by_altitude_penalty(
-            closest_aircraft_low_alt.distance, int(closest_aircraft_low_alt.altitude)):
+    if (distance_adjusted_by_altitude_penalty(distance, altitude) < distance_adjusted_by_altitude_penalty(
+            closest_aircraft_low_alt.distance, int(closest_aircraft_low_alt.altitude))
+            or is_last_message_too_old(closest_aircraft_low_alt)):
         return True
     return False
 
+
+def is_last_message_too_old(closest: Positions):
+    return datetime.datetime.now() - closest.message_received > MAX_TIME_WITHOUT_MESSAGE_IN_MIN
 
 def distance_adjusted_by_altitude_penalty(distance: float, altitude: int) -> float:
     return distance if altitude < PREF_ALT_LIMIT_IN_FEET else distance + 20
