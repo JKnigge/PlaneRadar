@@ -43,6 +43,7 @@ PREF_ALT_LIMIT_IN_FEET = 15000  # planes below this altitude will be preferred f
 MAX_MESSAGE_READ_RETRIES = 5
 SERVER_URL = "http://127.0.0.1:8000/update"
 CALLSIGNS_LIST_MAX_LEN = 30
+MAX_TIME_WITHOUT_MESSAGE_IN_MIN = 1
 
 ###############################################################################################
 # Program Code
@@ -260,6 +261,7 @@ def update_position_entry(position: Positions, message: SBSMessage, distance: fl
         position.bearing = bearing
         position.message_generated = message.get_generated_datetime()
         position.num_message = position.num_message + 1
+        position.message_received = datetime.datetime.now()
 
         position.save()
 
@@ -548,7 +550,7 @@ def update_screen_if_status_changed(screen_switch_state: bool, screentime_in_sec
     if was_screen_on and screen_switch_state != GPIO.HIGH:
         clear_screen()
         was_screen_on = False
-    elif not was_screen_on:
+    elif not was_screen_on and screen_switch_state == GPIO.HIGH:
         was_screen_on = True
         low_alt_prio_switch_state = read_switch_input(LOW_ALT_PRIO_SWITCH_PIN)
         show_on_screen(screentime_in_seconds, keepon, low_alt_prio_switch_state)
@@ -565,7 +567,7 @@ def process_planedata(download_file: bool, screentime: int, keepon: bool, broadc
         host = os.getenv("1090_HOST")
         port = int(os.getenv("1090_PORT"))
 
-        while True:  # Restart loop if connection is lost
+        while True:
             missing_messages = 0
             try:
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -586,7 +588,7 @@ def process_planedata(download_file: bool, screentime: int, keepon: bool, broadc
                                     f"/{MAX_MESSAGE_READ_RETRIES})...")
                                 continue
 
-                            missing_messages = 0  # Reset on successful read
+                            missing_messages = 0
                             message = SBSMessage(raw_message, aircraft_data)
                             if message.message_type == "MSG" and message.transmission_type == '1':
                                 turn_only_yellow_led_on()
