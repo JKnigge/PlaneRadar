@@ -199,7 +199,8 @@ def handle_transmission_type_3(message: SBSMessage) -> bool:
                 return False
             bearing = calculate_bearing(plane_position_in_radians, observer_position)
             position = create_or_update_position(bearing, callsign, distance, message)
-            print(f"Position added or updated (id: {position.id}, hex_ident: {position.hex_ident}, callsign_id: {position.callsign_id}).")
+            print(
+                f"Position added or updated (id: {position.id}, hex_ident: {position.hex_ident}, callsign_id: {position.callsign_id}).")
             if is_closest:
                 closest_aircraft = position
                 closest_aircraft_callsign = callsign
@@ -344,7 +345,11 @@ def is_plane_closer_low_alt(hex_ident: str, distance: float, altitude: int) -> b
 
 
 def is_last_message_too_old(closest: Positions):
-    return datetime.datetime.now() - closest.message_received > MAX_TIME_WITHOUT_MESSAGE_IN_MIN
+    if closest.message_received is None:
+        return True
+    return closest.message_received < datetime.datetime.now() - datetime.timedelta(
+        minutes=MAX_TIME_WITHOUT_MESSAGE_IN_MIN)
+
 
 def distance_adjusted_by_altitude_penalty(distance: float, altitude: int) -> float:
     return distance if altitude < PREF_ALT_LIMIT_IN_FEET else distance + 20
