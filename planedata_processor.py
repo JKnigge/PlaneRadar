@@ -528,7 +528,7 @@ def broadcast_closest_plane():
         "registration": callsign.registration if callsign.registration else "-",
         "registration_low": callsign_low.registration if callsign_low.registration else "-",
         "altitude": position.altitude if position.altitude else "-",
-        "altitude_low": position_low.altit_lowude if position_low.altitude else "-",
+        "altitude_low": position_low.altitude if position_low.altitude else "-",
         "distance": position.distance if position.distance else "-",
         "distance_low": position_low.distance if position_low.distance else "-",
         "type": callsign.typecode if callsign.typecode else "-",
@@ -536,9 +536,9 @@ def broadcast_closest_plane():
         "bearing": bearing_text,
         "bearing_low": bearing_text_low,
         "timestamp": position.message_received.strftime("%H:%M:%S") if position.message_received else "-",
-        "timestamp_low": position.message_received_low.strftime("%H:%M:%S") if position.message_received_low else "-",
+        "timestamp_low": position_low.message_received.strftime("%H:%M:%S") if position_low.message_received else "-",
         "message_num": position.num_message,
-        "message_num_low": position.num_message_low,
+        "message_num_low": position_low.num_message,
     }
     send_data_to_server(data)
 
