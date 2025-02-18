@@ -293,15 +293,6 @@ def create_position_entry(callsign: Callsigns, message: SBSMessage, distance: fl
         pass
 
 
-def get_last_callsign_during_last_hour_for(hex_ident: str) -> Callsigns:
-    one_hour_ago = datetime.datetime.now() - datetime.timedelta(hours=1)
-    return (Callsigns
-            .select()
-            .where((Callsigns.hex_ident == hex_ident) & (Callsigns.last_message_received > one_hour_ago))
-            .order_by(Callsigns.last_message_received.desc())
-            .first())
-
-
 def calculate_distance(plane_position_in_radians: (float, float), observer_position: (float, float)) -> float:
     f0 = cos(observer_position[0])  # local conversion for spherical coordinates
     distance = round(R0 * sqrt((plane_position_in_radians[0] - observer_position[0]) ** 2 + f0 ** 2 * (
@@ -514,30 +505,40 @@ def turn_off_all_led():
     GPIO.output(LED_GREEN_PIN, False)
 
 
-def broadcast_closest_plane(low_alt_prio_switch_state: bool):
-    global closest_aircraft
-    if closest_aircraft is None:
+def broadcast_closest_plane():
+    global closest_aircraft, closest_aircraft_low_alt, closest_aircraft_callsign, closest_aircraft_low_alt_callsign
+    if (closest_aircraft is None
+            or closest_aircraft_low_alt is None
+            or closest_aircraft_callsign is None
+            or closest_aircraft_low_alt_callsign is None):
         return
-    callsign = get_last_callsign_during_last_hour_for(closest_aircraft.hex_ident)
-    if callsign is None:
-        return
+
     position: Positions = closest_aircraft
+    position_low: Positions = closest_aircraft_low_alt
+    callsign: Callsigns = closest_aircraft_callsign
+    callsign_low: Callsigns = closest_aircraft_low_alt_callsign
     bearing_deg = round(math.degrees(position.bearing) % 360, 2)
+    bearing_deg_low = round(math.degrees(position_low.bearing) % 360, 2)
     bearing_text = to_string_with_leading_zero(int(bearing_deg))
-    if low_alt_prio_switch_state:
-        mode = "ALT PNY off"
-    else:
-        mode = "ALT PNY on"
+    bearing_text_low = to_string_with_leading_zero(int(bearing_deg_low))
+
     data = {
         "callsign": callsign.callsign,
+        "callsign_low": callsign_low.callsign,
         "registration": callsign.registration if callsign.registration else "-",
+        "registration_low": callsign_low.registration if callsign_low.registration else "-",
         "altitude": position.altitude if position.altitude else "-",
+        "altitude_low": position_low.altit_lowude if position_low.altitude else "-",
         "distance": position.distance if position.distance else "-",
+        "distance_low": position_low.distance if position_low.distance else "-",
         "type": callsign.typecode if callsign.typecode else "-",
+        "type_low": callsign_low.typecode if callsign_low.typecode else "-",
         "bearing": bearing_text,
+        "bearing_low": bearing_text_low,
         "timestamp": position.message_received.strftime("%H:%M:%S") if position.message_received else "-",
+        "timestamp_low": position.message_received_low.strftime("%H:%M:%S") if position.message_received_low else "-",
         "message_num": position.num_message,
-        "mode": mode
+        "message_num_low": position.num_message_low,
     }
     send_data_to_server(data)
 
@@ -610,7 +611,7 @@ def process_planedata(download_file: bool, screentime: int, keepon: bool, broadc
                                     last_low_alt_prio_switch_state = low_alt_prio_switch_state
                                     changed = True
                                 if changed and broadcast:
-                                    broadcast_closest_plane(low_alt_prio_switch_state)
+                                    broadcast_closest_plane()
                                 if changed and screen_switch_state == GPIO.HIGH:
                                     show_on_screen(screentime, keepon, low_alt_prio_switch_state)
 
