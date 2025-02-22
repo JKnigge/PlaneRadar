@@ -40,8 +40,10 @@ DEV_LOW_ALT_PRIO_SWITCH_STATE = False
 # Other Values
 R0 = 6371.0
 PREF_ALT_LIMIT_IN_FEET = 15000  # planes below this altitude will be preferred for the display.
+HIGH_ALT_DIST_PENALTY_IN_KM = 20
 MAX_MESSAGE_READ_RETRIES = 5
-SERVER_URL = "http://127.0.0.1:8000/update"
+BROADCAST_ENDPOINT = "update"
+AIRCRAFT_DATA_URL = "https://opensky-network.org/datasets/metadata/aircraftDatabase.csv"
 CALLSIGNS_LIST_MAX_LEN = 30
 MAX_TIME_WITHOUT_MESSAGE_IN_MIN = 1
 
@@ -61,6 +63,7 @@ callsigns: deque[Callsigns] = deque()
 load_dotenv()
 
 ENVIRONMENT = os.getenv("ENVIRONMENT")
+BROADCAST_ENDPOINT_URL = os.getenv("BROADCAST_SERVER_URL", "http://127.0.0.1:8000/") + BROADCAST_ENDPOINT
 
 if ENVIRONMENT == "development":
     import Mock.GPIO as GPIO
@@ -111,14 +114,13 @@ def get_aircraft_data(download_file: bool):
 
 
 def download_aircraft_data():
-    url = "https://opensky-network.org/datasets/metadata/aircraftDatabase.csv"
 
     # Path to the fallback local CSV file
     local_file = "aircraftDatabase.csv"
 
     try:
         # Attempt to fetch the CSV content from the online source
-        response = requests.get(url)
+        response = requests.get(AIRCRAFT_DATA_URL)
 
         if response.status_code == 200:
             csv_content = StringIO(response.text)
@@ -343,7 +345,7 @@ def is_last_message_too_old(closest: Positions):
 
 
 def distance_adjusted_by_altitude_penalty(distance: float, altitude: int) -> float:
-    return distance if altitude < PREF_ALT_LIMIT_IN_FEET else distance + 20
+    return distance if altitude < PREF_ALT_LIMIT_IN_FEET else distance + HIGH_ALT_DIST_PENALTY_IN_KM
 
 
 def clear_screen():
@@ -552,7 +554,7 @@ def send_data_to_server(data):
 
 
 def create_post_request(data):
-    requests.post(SERVER_URL, json=data)
+    requests.post(BROADCAST_ENDPOINT_URL, json=data)
 
 
 def update_screen_if_status_changed(screen_switch_state: bool, screentime_in_seconds: int, keepon: bool):
