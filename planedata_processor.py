@@ -4,21 +4,21 @@ import csv
 import datetime
 import math
 import os
+import socket
 import time
 import traceback
 from collections import deque
 from io import StringIO
+from math import radians, sqrt, cos
 from pathlib import Path
-import socket
 
 import requests
+from PIL import ImageDraw, Image
+from PIL import ImageFont
 from dotenv import load_dotenv
 from luma.core.interface.serial import i2c
 from luma.emulator.device import pygame
 from luma.oled.device import sh1106  # For real LCD screen
-from PIL import ImageFont
-from math import radians, sqrt, cos
-from PIL import ImageDraw, Image
 
 from SBSMessage import SBSMessage
 from database_models import Callsigns, Positions
@@ -34,6 +34,7 @@ LED_YELLOW_PIN = 27
 LED_GREEN_PIN = 17
 
 # Dev values:
+# Used to define switch states when run in a development environment without the actual switch.
 DEV_SCREEN_SWITCH_STATE = True
 DEV_LOW_ALT_PRIO_SWITCH_STATE = False
 
@@ -114,7 +115,6 @@ def get_aircraft_data(download_file: bool):
 
 
 def download_aircraft_data():
-
     # Path to the fallback local CSV file
     local_file = "aircraftDatabase.csv"
 
